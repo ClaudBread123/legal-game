@@ -1,5 +1,4 @@
 name = "llw-api-proxy"
 main = "index.js"
 compatibility_date = "2024-01-01"
-
-[vars]
+compatibility_flags = ["nodejs_compat"]

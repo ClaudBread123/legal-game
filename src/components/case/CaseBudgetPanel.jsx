@@ -1,6 +1,14 @@
 import MoneyDisplay from '../shared/MoneyDisplay.jsx'
 import StatusDot from '../shared/StatusDot.jsx'
 import { CONSEQUENCES } from '../../utils/consequencesEngine.js'
+import LITIGATION_PHASES from '../../data/litigationActions.js'
+
+function isPhaseUnlocked(phase, completedActions) {
+  if (phase.id === 'phase_1') return true
+  const unlocker = LITIGATION_PHASES.find(p => p.unlocksPhase === phase.id)
+  if (!unlocker) return true
+  return unlocker.unlockRequires.every(id => completedActions.includes(id))
+}
 
 const TYPE_LABELS = {
   state_tort: 'State Tort',
@@ -47,6 +55,7 @@ export default function CaseBudgetPanel({ caseObject }) {
   const health = caseObject.caseHealth ?? 100
   const prob = caseObject.caseOutcomeProbability ?? { strongWin: 40, settleDefense: 30, settleNeutral: 20, loss: 10 }
   const activeConsequences = caseObject.activeConsequences || []
+  const completedActions = caseObject.completedActions || []
 
   return (
     <div style={{
@@ -145,7 +154,7 @@ export default function CaseBudgetPanel({ caseObject }) {
 
       {/* Active Consequences */}
       {activeConsequences.length > 0 && (
-        <>
+        <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '11px', color: 'var(--accent-red)', letterSpacing: '0.1em', marginBottom: '8px', fontWeight: 600 }}>
             ACTIVE ISSUES
           </div>
@@ -157,8 +166,36 @@ export default function CaseBudgetPanel({ caseObject }) {
               </span>
             </div>
           ))}
-        </>
+        </div>
       )}
+
+      {/* Phase progress dots */}
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '8px' }}>
+        PHASES
+      </div>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+        {LITIGATION_PHASES.map(phase => {
+          const unlocked = isPhaseUnlocked(phase, completedActions)
+          const doneCount = phase.actions.filter(a => completedActions.includes(a.id)).length
+          const allDone = doneCount === phase.actions.length
+          return (
+            <div key={phase.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+              <div title={phase.label} style={{
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: allDone ? phase.color : unlocked ? `${phase.color}40` : 'transparent',
+                border: `1.5px solid ${unlocked ? phase.color : 'var(--border)'}`,
+                transition: 'all 0.3s ease',
+              }} />
+              <span style={{
+                fontSize: '9px', fontFamily: 'var(--font-mono)',
+                color: unlocked ? 'var(--text-muted)' : 'var(--border)',
+              }}>
+                {doneCount}/{phase.actions.length}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

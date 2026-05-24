@@ -264,4 +264,38 @@ We are now committed to state court. Adjust the litigation strategy accordingly.
 — RL`,
     priority: 'high',
   }),
+
+  initial_eval_overdue: ctx => ({
+    from: 'Maria Wizel',
+    fromEmail: 'm.wizel@llopizwizel.com',
+    subject: `Initial Evaluation Overdue — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+I am following up on ${ctx.caseId}. The client and carrier have not received an initial liability evaluation and litigation budget. We are past 30 days on this file.
+
+The initial evaluation is not optional — it is a standard deliverable on every new matter. The carrier needs it to set reserves. The client needs it to understand their exposure.
+
+Please submit your evaluation today. If you have questions on the format, see the office litigation manual.
+
+— MW`,
+    priority: 'high',
+  }),
+
+  preservation_missed: ctx => ({
+    from: 'Rafael Llopiz',
+    fromEmail: 'r.llopiz@llopizwizel.com',
+    subject: `No Preservation Letter Sent — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+I reviewed the file in ${ctx.caseId} and I do not see a preservation letter sent to plaintiff's counsel.
+
+We are now three weeks into this matter. Every day without a preservation demand is a day where plaintiff can delete text messages, post and remove social media, discard clothing and shoes, and allow surveillance footage to be overwritten — all without consequence to them.
+
+A spoliation argument requires a prior preservation demand. We no longer have a clean record on that.
+
+Send the preservation letter today. Document everything you have already found before anything else disappears.
+
+— RL`,
+    priority: 'high',
+  }),
 }

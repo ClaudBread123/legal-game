@@ -120,6 +120,26 @@ export const CONSEQUENCES = {
     locksActions: [],
     complicatesActions: [],
   },
+  initial_eval_overdue: {
+    id: 'initial_eval_overdue',
+    label: 'Initial Evaluation Overdue',
+    healthImpact: -10,
+    probabilityShift: { strongWin: -5, settleDefense: -3, loss: 5, settleNeutral: 3 },
+    description: 'The initial liability evaluation and litigation budget was not submitted within 30 days of assignment. Client and carrier have been left without guidance on exposure and strategy. This is a billable work compliance failure.',
+    emailTemplate: 'initial_eval_overdue',
+    locksActions: [],
+    complicatesActions: ['initial_evaluation'],
+  },
+  preservation_missed: {
+    id: 'preservation_missed',
+    label: 'No Preservation Demand Sent',
+    healthImpact: -15,
+    probabilityShift: { strongWin: -5, loss: 8, settleNeutral: 7 },
+    description: 'No preservation letter was sent to opposing counsel within 21 days of case assignment. Without a prior preservation demand, any subsequent evidence destruction by plaintiff cannot be used to argue spoliation. Key evidence — video footage, text messages, social media — may now be lost without consequence to plaintiff.',
+    emailTemplate: 'preservation_missed',
+    locksActions: [],
+    complicatesActions: ['motion_summary_judgment'],
+  },
 }
 
 function evaluateCaseTriggers(c, currentDate) {
@@ -187,6 +207,20 @@ function evaluateCaseTriggers(c, currentDate) {
   if (!done('removal_waived') && has1983Claim(c)) {
     if (!completed.includes('motion_to_dismiss') && daysSinceFiling > 30) {
       triggered.push('removal_waived')
+    }
+  }
+
+  // 8. Initial evaluation overdue — 30 days without initial_evaluation
+  if (!done('initial_eval_overdue')) {
+    if (!completed.includes('initial_evaluation') && daysSinceFiling >= 30) {
+      triggered.push('initial_eval_overdue')
+    }
+  }
+
+  // 9. Preservation letter missed — 21 days without preservation_letter
+  if (!done('preservation_missed')) {
+    if (!completed.includes('preservation_letter') && daysSinceFiling >= 21) {
+      triggered.push('preservation_missed')
     }
   }
 

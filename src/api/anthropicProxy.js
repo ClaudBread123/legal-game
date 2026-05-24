@@ -1,18 +1,39 @@
+const PROXY_URL = import.meta.env.VITE_API_PROXY_URL
+
+export function isApiAvailable() {
+  return !!(
+    PROXY_URL &&
+    PROXY_URL !== 'PLACEHOLDER' &&
+    PROXY_URL !== 'https://placeholder.example.com'
+  )
+}
+
 export async function callClaude({ system, userMessage, maxTokens = 1000 }) {
-  const url = import.meta.env.VITE_API_PROXY_URL
-  if (!url || url === 'PLACEHOLDER') {
+  if (!isApiAvailable()) {
     throw new Error('API_UNAVAILABLE')
   }
+
   try {
-    const res = await fetch(url, {
+    const response = await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system, userMessage, maxTokens }),
     })
-    if (!res.ok) throw new Error('API_UNAVAILABLE')
-    const data = await res.json()
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
     return data.text
-  } catch {
+  } catch (err) {
+    if (err.message === 'API_UNAVAILABLE') throw err
+    console.warn('Claude API call failed:', err.message)
     throw new Error('API_UNAVAILABLE')
   }
 }

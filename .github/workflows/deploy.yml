@@ -30,10 +30,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Get Worker URL
+        id: worker-url
+        run: |
+          echo "VITE_API_PROXY_URL=https://llw-api-proxy.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev" >> $GITHUB_ENV
+
       - name: Build
         run: npm run build
         env:
-          VITE_API_PROXY_URL: ${{ secrets.VITE_API_PROXY_URL }}
+          VITE_API_PROXY_URL: ${{ env.VITE_API_PROXY_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

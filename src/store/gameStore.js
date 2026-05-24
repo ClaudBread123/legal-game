@@ -7,6 +7,7 @@ import { BILLING_RATE } from '../data/issueTypes.js'
 import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequencesEngine.js'
+import { isApiAvailable } from '../api/anthropicProxy.js'
 
 const SAVE_KEY = 'llw_save_v2'
 const OLD_SAVE_KEY = 'llw_save_v1'
@@ -179,7 +180,7 @@ const defaultState = {
   timekeepingSubmitted: {},
   managingPartnerMessages: [],
   monthlyBillableHours: 0,
-  apiAvailable: true,
+  apiAvailable: isApiAvailable(),
   emails: [],
   generatedEmailEvents: [],
   staleGameCleared: false,
@@ -544,6 +545,14 @@ export const useGameStore = create((set, get) => ({
   setApiAvailable(bool) {
     const state = get()
     const updated = { apiAvailable: bool }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  checkApiAvailability() {
+    const state = get()
+    const available = isApiAvailable()
+    const updated = { apiAvailable: available }
     set(updated)
     persist({ ...state, ...updated })
   },
