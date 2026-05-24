@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { FALLBACK_CASES } from '../data/fallbackCases.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { getTitleFromXP } from '../utils/scoring.js'
-import { getSimulatedStartDate, advanceBusinessDay } from '../utils/dateUtils.js'
+import { getSimulatedStartDate, advanceBusinessDay, formatShortDate } from '../utils/dateUtils.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
+import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
+import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 
 const SAVE_KEY = 'llw_save_v1'
 
@@ -26,6 +28,69 @@ function loadSaved() {
   return null
 }
 
+function makeEmailId() {
+  return `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`
+}
+
+function buildWelcomeEmails(playerName, startDate) {
+  const dateStr = formatShortDate(startDate)
+  return [
+    {
+      id: makeEmailId(),
+      timestamp: startDate,
+      read: false,
+      from: 'Rafael Llopiz',
+      fromEmail: 'r.llopiz@llopizwizel.com',
+      to: playerName,
+      subject: 'Welcome to the Practice Group',
+      priority: 'high',
+      body: `${playerName},
+
+Welcome to the governmental defense group. Your first cases have been assigned.
+
+Review the complaints carefully — threshold issues on governmental claims must be identified immediately. Do not let deadlines pass without action.
+
+A missed §768.28(9) argument, a deficient pre-suit notice, an unrecognized federal removal hook — these are the issues that define careers here, in both directions.
+
+My door is open.
+
+— RL`,
+    },
+    {
+      id: makeEmailId(),
+      timestamp: startDate,
+      read: true,
+      from: 'Maria Santos — Firm Administrator',
+      fromEmail: 'admin@llopizwizel.com',
+      to: playerName,
+      subject: 'Timekeeping Policy Reminder',
+      priority: 'normal',
+      body: `All associates are required to submit timekeeping daily by 6:00 PM.
+
+The target is 165–200 billable hours per month. Timekeeping delinquency is noted in quarterly reviews and affects year-end evaluations.
+
+Please ensure all time entries are complete and properly described before submission. Vague entries such as "research" or "review" will be returned for revision.
+
+Thank you,
+Maria Santos
+Firm Administrator`,
+    },
+  ]
+}
+
+function buildCaseAssignedEmails(cases, playerName, startDate) {
+  return cases.map(c => {
+    const data = EMAIL_TEMPLATES.case_assigned({
+      playerName,
+      caseId: c.caseId,
+      defendant: c.defendant,
+      clientName: c.clientName,
+      caseType: c.caseType,
+    })
+    return { id: makeEmailId(), timestamp: startDate, read: false, to: playerName, ...data }
+  })
+}
+
 const defaultState = {
   player: {
     name: 'Joshy Llopiz',
@@ -46,6 +111,8 @@ const defaultState = {
   managingPartnerMessages: [],
   monthlyBillableHours: 0,
   apiAvailable: true,
+  emails: [],
+  generatedEmailEvents: [],
 }
 
 const saved = loadSaved()
@@ -58,6 +125,8 @@ export const useGameStore = create((set, get) => ({
   initGame(playerName) {
     const startDate = getSimulatedStartDate()
     const cases = FALLBACK_CASES.map(c => ({ ...c }))
+    const welcomeEmails = buildWelcomeEmails(playerName, startDate)
+    const caseEmails = buildCaseAssignedEmails(cases, playerName, startDate)
     const newState = {
       ...defaultState,
       player: {
@@ -80,6 +149,8 @@ export const useGameStore = create((set, get) => ({
           type: 'action',
         },
       ],
+      emails: [...caseEmails, ...welcomeEmails],
+      generatedEmailEvents: cases.map(c => `case_assigned_${c.caseId}`),
     }
     set(newState)
     persist(newState)
@@ -88,7 +159,13 @@ export const useGameStore = create((set, get) => ({
   advanceDay() {
     const state = get()
     const nextDate = advanceBusinessDay(state.currentDate)
-    // Check deadlines on all cases
+
+    // Run email engine against current state
+    const newEmailResults = checkAndGenerateEmails(state)
+    const newEmails = newEmailResults.map(r => ({ ...r.email, to: state.player.name }))
+    const newEventKeys = newEmailResults.map(r => r.key)
+
+    // Check deadline notifications on all cases
     const newNotifications = []
     state.cases.forEach(c => {
       const daysSinceFiled = Math.round(
@@ -104,10 +181,13 @@ export const useGameStore = create((set, get) => ({
         })
       }
     })
+
     const updated = {
       currentDate: nextDate,
       dailyActionsRemaining: state.dailyActionsTotal || 6,
       notifications: [...state.notifications, ...newNotifications],
+      emails: [...newEmails, ...(state.emails || [])],
+      generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
       activityFeed: [
         {
           id: Date.now().toString(),
@@ -170,6 +250,7 @@ export const useGameStore = create((set, get) => ({
       activityFeed: [feedEntry, ...state.activityFeed].slice(0, 50),
     }
     if (promoted) {
+      // Add promotion notification
       updated.notifications = [
         {
           id: `promo-${Date.now()}`,
@@ -178,8 +259,23 @@ export const useGameStore = create((set, get) => ({
           type: 'promotion',
           caseId: null,
         },
-        ...state.notifications,
+        ...(state.notifications || []),
       ]
+      // Add promotion email
+      const promoEmailData = EMAIL_TEMPLATES.promotion({
+        playerName: state.player.name,
+        newTitle,
+        effectiveDate: state.currentDate || 'today',
+        newSalary,
+      })
+      const promoEmail = {
+        id: makeEmailId(),
+        timestamp: state.currentDate,
+        read: false,
+        to: state.player.name,
+        ...promoEmailData,
+      }
+      updated.emails = [promoEmail, ...(state.emails || [])]
     }
     set(updated)
     persist({ ...state, ...updated })
@@ -198,7 +294,7 @@ export const useGameStore = create((set, get) => ({
     const updated = {
       notifications: [
         { id: `notif-${Date.now()}`, message, read: false, type, caseId },
-        ...state.notifications,
+        ...(state.notifications || []),
       ],
     }
     set(updated)
@@ -214,6 +310,24 @@ export const useGameStore = create((set, get) => ({
     persist({ ...state, ...updated })
   },
 
+  addEmail(emailObject) {
+    const state = get()
+    const updated = {
+      emails: [{ ...emailObject, id: makeEmailId(), timestamp: state.currentDate, read: false }, ...(state.emails || [])],
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  markEmailRead(emailId) {
+    const state = get()
+    const updated = {
+      emails: (state.emails || []).map(e => e.id === emailId ? { ...e, read: true } : e),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
   addMPMessage(caseId, content) {
     const state = get()
     const msg = {
@@ -223,7 +337,7 @@ export const useGameStore = create((set, get) => ({
       content,
       read: false,
     }
-    const updated = { managingPartnerMessages: [msg, ...state.managingPartnerMessages] }
+    const updated = { managingPartnerMessages: [msg, ...(state.managingPartnerMessages || [])] }
     set(updated)
     persist({ ...state, ...updated })
   },

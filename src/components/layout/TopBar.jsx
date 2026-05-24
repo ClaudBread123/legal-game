@@ -5,8 +5,8 @@ import { formatGameDate } from '../../utils/dateUtils.js'
 
 export default function TopBar() {
   const navigate = useNavigate()
-  const { player, currentDate, dailyActionsRemaining, notifications } = useGameStore()
-  const unread = notifications.filter(n => !n.read).length
+  const { player, currentDate, dailyActionsRemaining, emails } = useGameStore()
+  const unread = (emails || []).filter(e => !e.read).length
 
   return (
     <div style={{

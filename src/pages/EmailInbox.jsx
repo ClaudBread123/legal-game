@@ -2,63 +2,53 @@ import { useState } from 'react'
 import { useGameStore } from '../store/gameStore.js'
 import { formatShortDate } from '../utils/dateUtils.js'
 
-function buildEmails(playerName, currentDate) {
-  const dateStr = currentDate ? formatShortDate(currentDate) : 'Today'
-  return [
-    {
-      id: 1,
-      from: 'Rafael Llopiz',
-      email: 'r.llopiz@llopizwizel.com',
-      to: playerName,
-      subject: 'Welcome to the Practice Group',
-      date: dateStr,
-      read: false,
-      body: `${playerName},
+const PRIORITY_BORDER = {
+  urgent: 'var(--accent-red)',
+  high: 'var(--accent-gold)',
+  normal: 'transparent',
+}
 
-Welcome to the governmental defense group. Your first cases have been assigned.
-
-Review the complaints carefully — threshold issues on governmental claims must be identified immediately. Do not let deadlines pass without action.
-
-A missed §768.28(9) argument, a deficient pre-suit notice, an unrecognized federal removal hook — these are the issues that define careers here, in both directions.
-
-My door is open.
-
-— RL`,
-    },
-    {
-      id: 2,
-      from: 'Maria Santos — Firm Administrator',
-      email: 'admin@llopizwizel.com',
-      to: playerName,
-      subject: 'Timekeeping Policy Reminder',
-      date: dateStr,
-      read: true,
-      body: `All associates are required to submit timekeeping daily by 6:00 PM.
-
-The target is 165–200 billable hours per month. Timekeeping delinquency is noted in quarterly reviews and affects year-end evaluations.
-
-Please ensure all time entries are complete and properly described before submission. Vague entries such as "research" or "review" will be returned for revision.
-
-Thank you,
-Maria Santos
-Firm Administrator`,
-    },
-  ]
+function priorityPill(priority) {
+  if (priority === 'urgent') {
+    return (
+      <span style={{
+        fontSize: '9px', background: 'var(--accent-red)', color: '#fff',
+        borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
+        fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
+      }}>
+        URGENT
+      </span>
+    )
+  }
+  if (priority === 'high') {
+    return (
+      <span style={{
+        fontSize: '9px', background: 'rgba(201,168,76,0.2)', color: 'var(--accent-gold)',
+        borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
+        fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
+      }}>
+        HIGH
+      </span>
+    )
+  }
+  return null
 }
 
 export default function EmailInbox() {
-  const { player, currentDate } = useGameStore()
-  const emails = buildEmails(player.name, currentDate)
-
-  const [selected, setSelected] = useState(emails[0])
+  const { emails: storeEmails, markEmailRead } = useGameStore()
+  const [selected, setSelected] = useState(null)
   const [folder, setFolder] = useState('Inbox')
-  const [readIds, setReadIds] = useState(new Set(emails.filter(e => e.read).map(e => e.id)))
 
-  const unreadCount = emails.filter(e => !readIds.has(e.id)).length
+  const emails = [...(storeEmails || [])].sort((a, b) => {
+    if (a.read !== b.read) return a.read ? 1 : -1
+    return new Date(b.timestamp) - new Date(a.timestamp)
+  })
+
+  const unreadCount = emails.filter(e => !e.read).length
 
   const handleSelect = email => {
     setSelected(email)
-    setReadIds(prev => new Set([...prev, email.id]))
+    if (!email.read) markEmailRead(email.id)
   }
 
   return (
@@ -115,49 +105,68 @@ export default function EmailInbox() {
           padding: '16px 16px 12px', borderBottom: '1px solid var(--border)',
           fontFamily: 'var(--font-serif)', fontSize: '16px', color: 'var(--text-primary)',
         }}>
-          {folder}
+          {folder}{folder === 'Inbox' && unreadCount > 0 ? ` (${unreadCount})` : ''}
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
+          {folder === 'Inbox' && emails.length === 0 && (
+            <div style={{ padding: '24px 16px', fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center' }}>
+              No messages.
+            </div>
+          )}
           {(folder === 'Inbox' ? emails : []).map(email => {
-            const isRead = readIds.has(email.id)
             const isSelected = selected?.id === email.id
+            const borderColor = PRIORITY_BORDER[email.priority] || 'transparent'
             return (
               <div
                 key={email.id}
                 onClick={() => handleSelect(email)}
                 style={{
-                  padding: '14px 16px', borderBottom: '1px solid var(--border)',
+                  padding: '12px 14px', borderBottom: '1px solid var(--border)',
                   cursor: 'pointer',
                   background: isSelected
                     ? 'rgba(201,168,76,0.08)'
-                    : isRead ? 'transparent' : 'rgba(74,158,255,0.04)',
-                  borderLeft: isSelected ? '3px solid var(--accent-gold)' : '3px solid transparent',
+                    : email.read ? 'transparent' : 'rgba(74,158,255,0.04)',
+                  borderLeft: isSelected
+                    ? `3px solid var(--accent-gold)`
+                    : `3px solid ${borderColor}`,
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', alignItems: 'flex-start' }}>
-                  <span style={{
-                    fontSize: '13px', fontWeight: isRead ? 400 : 600,
-                    color: isRead ? 'var(--text-secondary)' : 'var(--text-primary)',
-                    fontFamily: 'var(--font-sans)',
-                  }}>
-                    {email.from.split('—')[0].trim()}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '8px' }}>
-                    {email.date}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                    {!email.read && (
+                      <span style={{
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: 'var(--accent-gold)', flexShrink: 0,
+                      }} />
+                    )}
+                    <span style={{
+                      fontSize: '13px', fontWeight: email.read ? 400 : 700,
+                      color: email.read ? 'var(--text-secondary)' : 'var(--text-primary)',
+                      fontFamily: 'var(--font-sans)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {(email.from || '').split('—')[0].trim()}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                    {email.timestamp ? formatShortDate(email.timestamp) : ''}
                   </span>
                 </div>
-                <div style={{
-                  fontSize: '12px', fontWeight: isRead ? 400 : 600,
-                  color: isRead ? 'var(--text-muted)' : 'var(--text-secondary)',
-                  marginBottom: '3px',
-                }}>
-                  {email.subject}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                  <span style={{
+                    fontSize: '12px', fontWeight: email.read ? 400 : 600,
+                    color: email.read ? 'var(--text-muted)' : 'var(--text-secondary)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                  }}>
+                    {email.subject}
+                  </span>
+                  {priorityPill(email.priority)}
                 </div>
                 <div style={{
                   fontSize: '11px', color: 'var(--text-muted)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {email.body.slice(0, 60)}…
+                  {(email.body || '').slice(0, 60)}…
                 </div>
               </div>
             )
@@ -175,24 +184,31 @@ export default function EmailInbox() {
         {selected ? (
           <>
             <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid var(--border)' }}>
-              <h2 style={{
-                fontFamily: 'var(--font-serif)', fontSize: '22px', margin: '0 0 16px',
-                color: 'var(--text-primary)',
-              }}>
-                {selected.subject}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <h2 style={{
+                  fontFamily: 'var(--font-serif)', fontSize: '22px', margin: 0,
+                  color: 'var(--text-primary)', flex: 1,
+                }}>
+                  {selected.subject}
+                </h2>
+                {priorityPill(selected.priority)}
+              </div>
               <div style={{
                 display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px',
                 fontSize: '13px', lineHeight: '1.8',
               }}>
                 <span style={{ color: 'var(--text-muted)' }}>From:</span>
                 <span style={{ color: 'var(--accent-gold)', fontFamily: 'var(--font-sans)' }}>
-                  {selected.from} <span style={{ color: 'var(--text-muted)' }}>&lt;{selected.email}&gt;</span>
+                  {selected.from}{selected.fromEmail && (
+                    <span style={{ color: 'var(--text-muted)' }}> &lt;{selected.fromEmail}&gt;</span>
+                  )}
                 </span>
                 <span style={{ color: 'var(--text-muted)' }}>To:</span>
                 <span style={{ color: 'var(--text-secondary)' }}>{selected.to}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Date:</span>
-                <span style={{ color: 'var(--text-secondary)' }}>{selected.date}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {selected.timestamp ? formatShortDate(selected.timestamp) : '—'}
+                </span>
               </div>
             </div>
             <div style={{

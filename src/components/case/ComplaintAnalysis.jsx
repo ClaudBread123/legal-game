@@ -347,6 +347,27 @@ export default function ComplaintAnalysis({ caseObject }) {
                 </div>
               )}
 
+              {/* Legally nuanced flags — no penalty, educational note */}
+              {result.legallyNuanced?.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent-blue)', letterSpacing: '0.1em', marginBottom: '10px', fontWeight: 600 }}>
+                    ◆ LEGALLY NUANCED FLAGS ({result.legallyNuanced.length}) — No Penalty
+                  </div>
+                  {result.legallyNuanced.map(item => (
+                    <div key={item.issueId} style={{
+                      padding: '8px 12px', background: 'rgba(74,158,255,0.07)',
+                      borderLeft: '3px solid var(--accent-blue)', borderRadius: '0 6px 6px 0',
+                      marginBottom: '6px',
+                    }}>
+                      <div style={{ fontSize: '13px', color: 'var(--accent-blue)', marginBottom: '3px' }}>
+                        {ISSUE_LABEL_MAP[item.issueId] || item.issueId}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{item.reason}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Assessment */}
               <div style={{
                 padding: '12px', background: 'var(--bg-card)', borderRadius: '6px',

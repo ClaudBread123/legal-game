@@ -97,7 +97,7 @@ export const FALLBACK_CASES = [
       {
         issueType: 'federal_removal_1983',
         description:
-          'Counts II and III assert claims under 42 U.S.C. §1983, creating federal question jurisdiction. This case is removable to federal district court under 28 U.S.C. §1441. Evaluate whether removal is strategically advantageous. Notice of removal must be filed within 30 days of service of the complaint. This deadline is imminent.',
+          'Counts II and III assert claims under 42 U.S.C. §1983, creating federal question jurisdiction. This case is removable to federal district court under 28 U.S.C. §1441. Notice of removal must be filed within 30 days of service of the complaint. This deadline is imminent and non-waivable. Evaluate whether removal is strategically advantageous — federal court provides access to qualified immunity arguments and Eleventh Amendment considerations unavailable in state court.',
         severity: 'critical',
         statute: '42 U.S.C. §1983; 28 U.S.C. §1441',
         deadline: '30 days from service',
@@ -105,26 +105,18 @@ export const FALLBACK_CASES = [
       {
         issueType: 'barred_individual_defendant',
         description:
-          'Count IV names Principal Kretch individually for wrongful termination. If Kretch acted within scope of his employment as principal and without bad faith or malice, Count IV is barred under §768.28(9). Evaluate the facts of the termination decision.',
+          'Count IV names Principal Kretch individually for wrongful termination. If Kretch acted within the scope of his employment as principal and without bad faith, malice, or wanton conduct, Count IV is barred under §768.28(9). The exclusive remedy is against the Academy. Evaluate the specific facts of the termination decision — was it a personnel decision within his administrative authority, or did it involve conduct rising to bad faith or malice?',
         severity: 'critical',
         statute: '§768.28(9), Fla. Stat.',
         deadline: null,
       },
       {
-        issueType: 'hb145_cap_applicability',
+        issueType: 'sovereign_immunity_bar',
         description:
-          'The termination occurred November 3, 2026 — after the HB 145 effective date of October 1, 2026. The new caps apply: $350,000 per person, $500,000 per occurrence for state tort claims. Note: §1983 claims are not subject to sovereign immunity caps — exposure is uncapped for federal civil rights violations.',
+          'Count I (Florida Whistle-blower Act) is a state statutory claim against the Academy. Charter schools that are instrumentalities of the state may assert sovereign immunity defenses. Evaluate whether Suncoast Charter Academy qualifies as a state agency or subdivision under §768.28(2). If so, sovereign immunity caps apply to Count I — but note that §1983 claims in Counts II and III are federal civil rights claims to which sovereign immunity caps do NOT apply. Exposure on the federal counts is uncapped.',
         severity: 'major',
-        statute: '§768.28(5), Fla. Stat. as amended by HB 145',
+        statute: '§768.28(2), Fla. Stat.',
         deadline: null,
-      },
-      {
-        issueType: 'hb145_notice_window',
-        description:
-          "For the state tort/whistle-blower claims (Count I), the incident accrued November 3, 2026 — after HB 145's effective date. The new 18-month pre-suit notice window applies. Notice must have been presented within 18 months of November 3, 2026 (by May 3, 2028). Verify notice was timely and sufficient.",
-        severity: 'critical',
-        statute: '§768.28(6)(a), Fla. Stat. as amended by HB 145',
-        deadline: '2028-05-03',
       },
     ],
     applicableDefenses: [
