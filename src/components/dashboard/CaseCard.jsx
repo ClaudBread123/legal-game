@@ -95,7 +95,7 @@ export default function CaseCard({ caseObject }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
             {(caseObject.hoursBilled || 0).toFixed(1)}h
@@ -112,6 +112,39 @@ export default function CaseCard({ caseObject }) {
           View Case →
         </span>
       </div>
+
+      {/* Case Health Bar */}
+      {(() => {
+        const health = caseObject.caseHealth ?? 100
+        const hColor = health >= 80 ? '#4ade80' : health >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)'
+        const activeCount = (caseObject.activeConsequences || []).length
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em' }}>CASE HEALTH</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {activeCount > 0 && (
+                  <span style={{
+                    fontSize: '10px', background: 'var(--accent-red)22', color: 'var(--accent-red)',
+                    borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
+                  }}>
+                    {activeCount} issue{activeCount > 1 ? 's' : ''}
+                  </span>
+                )}
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: hColor }}>
+                  {health}/100
+                </span>
+              </div>
+            </div>
+            <div style={{ height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${health}%`,
+                background: hColor, borderRadius: '2px', transition: 'width 0.3s ease',
+              }} />
+            </div>
+          </div>
+        )
+      })()}
     </motion.div>
   )
 }

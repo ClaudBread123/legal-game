@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom'
 import { useGameStore } from '../../store/gameStore.js'
 import { calculateDeadlines } from '../../utils/deadlineEngine.js'
 import { daysBetween } from '../../utils/dateUtils.js'
+import { CONSEQUENCES } from '../../utils/consequencesEngine.js'
 import StatusDot from '../shared/StatusDot.jsx'
 
 const DEADLINE_LABELS = {
@@ -110,11 +112,24 @@ function computeAlerts(cases, currentDate) {
 }
 
 export default function PriorityAlerts() {
+  const navigate = useNavigate()
   const { cases, currentDate, notifications, markNotificationRead } = useGameStore()
   const caseAlerts = computeAlerts(cases, currentDate)
   const storeAlerts = notifications.filter(n => !n.read).slice(0, 3)
 
-  const allEmpty = caseAlerts.length === 0 && storeAlerts.length === 0
+  // Collect active consequences across all cases
+  const activeConsequenceItems = []
+  for (const c of cases) {
+    if (c.status === 'closed') continue
+    for (const id of c.activeConsequences || []) {
+      const def = CONSEQUENCES[id]
+      if (def) {
+        activeConsequenceItems.push({ caseId: c.caseId, id, def })
+      }
+    }
+  }
+
+  const allEmpty = caseAlerts.length === 0 && storeAlerts.length === 0 && activeConsequenceItems.length === 0
 
   return (
     <div style={{
@@ -130,12 +145,12 @@ export default function PriorityAlerts() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <span>PRIORITY ALERTS</span>
-        {caseAlerts.length > 0 && (
+        {(caseAlerts.length + activeConsequenceItems.length) > 0 && (
           <span style={{
             background: 'var(--accent-red)', color: '#fff', borderRadius: '10px',
             padding: '1px 6px', fontSize: '10px', fontFamily: 'var(--font-mono)',
           }}>
-            {caseAlerts.length}
+            {caseAlerts.length + activeConsequenceItems.length}
           </span>
         )}
       </div>
@@ -146,6 +161,46 @@ export default function PriorityAlerts() {
         </div>
       ) : (
         <>
+          {/* Active consequences section — shown first */}
+          {activeConsequenceItems.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{
+                fontSize: '10px', color: 'var(--accent-red)', letterSpacing: '0.1em',
+                fontWeight: 700, marginBottom: '6px', fontFamily: 'var(--font-sans)',
+              }}>
+                ACTIVE CASE CONSEQUENCES
+              </div>
+              {activeConsequenceItems.map(({ caseId, id, def }) => (
+                <div
+                  key={`${caseId}-${id}`}
+                  onClick={() => navigate(`/case/${caseId}`)}
+                  style={{
+                    padding: '8px 10px', marginBottom: '4px', borderRadius: '6px',
+                    background: 'rgba(239,68,68,0.06)', border: '1px solid var(--accent-red)44',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--accent-red)', fontWeight: 600 }}>
+                      ⚠ {def.label}
+                    </span>
+                    {def.healthImpact !== 0 && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--accent-red)' }}>
+                        {def.healthImpact} health
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                    {caseId}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                    {def.description.split('.')[0]}.
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {caseAlerts.map(alert => (
             <div key={alert.id} style={{
               display: 'flex', gap: '10px', padding: '8px 0',

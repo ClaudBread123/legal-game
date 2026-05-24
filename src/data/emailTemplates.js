@@ -198,4 +198,70 @@ ${ctx.hours} billable hours for ${ctx.month}. That is within our target range. K
 — RL`,
     priority: 'normal',
   }),
+
+  mtd_denied_consequence: ctx => ({
+    from: 'Rafael Llopiz',
+    fromEmail: 'r.llopiz@llopizwizel.com',
+    subject: `Motion to Dismiss Denied — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+The Motion to Dismiss in ${ctx.caseId} was denied. I have reviewed the hearing record.
+
+The motion was set for a 5-minute hearing slot — that is not enough time to argue threshold governmental immunity issues. This case needed at minimum 30 minutes before the judge. A 5-minute slot on a motion to dismiss in a governmental tort case is essentially a denial waiting to happen.
+
+The grounds we raised are not gone entirely — some can be renewed at summary judgment. But we have lost the early exit opportunity, and the client will pay for full discovery as a result.
+
+Case health is now significantly compromised. I want a revised litigation plan on my desk immediately.
+
+— RL`,
+    priority: 'urgent',
+  }),
+
+  expert_excluded_consequence: ctx => ({
+    from: 'Rafael Llopiz',
+    fromEmail: 'r.llopiz@llopizwizel.com',
+    subject: `URGENT: Expert Excluded — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+Plaintiff's motion to exclude our expert in ${ctx.caseId} was granted. The expert disclosure deadline passed without a timely disclosure. The court had no choice but to grant the motion.
+
+This is a serious, potentially case-dispositive error. Proceeding to summary judgment or trial without expert testimony in this type of case is extremely difficult.
+
+I need to meet with you today. This needs to be reported to the client immediately.
+
+— RL`,
+    priority: 'urgent',
+  }),
+
+  rfa_deemed_consequence: ctx => ({
+    from: 'Rafael Llopiz',
+    fromEmail: 'r.llopiz@llopizwizel.com',
+    subject: `RFAs Deemed Admitted — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+I have just been informed that plaintiff's Requests for Admissions in ${ctx.caseId} were not answered within 30 days. They are now deemed admitted under Rule 1.370.
+
+Do you understand what this means? Plaintiff has now established — by our own silence — facts that support their case. We can file a motion for relief from the admissions but courts grant those sparingly and only on a showing of good cause.
+
+This is the kind of error that ends careers. I am scheduling an immediate case review.
+
+— RL`,
+    priority: 'urgent',
+  }),
+
+  removal_waived_consequence: ctx => ({
+    from: 'Rafael Llopiz',
+    fromEmail: 'r.llopiz@llopizwizel.com',
+    subject: `Federal Removal Deadline Passed — ${ctx.caseId}`,
+    body: `${ctx.playerName},
+
+The 30-day window to remove ${ctx.caseId} to federal district court has closed. I see no Notice of Removal in the file.
+
+This case contains claims under 42 U.S.C. §1983. Federal court was the correct venue — qualified immunity arguments, Eleventh Amendment considerations, and a more favorable procedural environment are now unavailable to us.
+
+We are now committed to state court. Adjust the litigation strategy accordingly. I want to discuss this at your earliest availability.
+
+— RL`,
+    priority: 'high',
+  }),
 }

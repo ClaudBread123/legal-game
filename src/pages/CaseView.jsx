@@ -4,11 +4,12 @@ import { useGameStore } from '../store/gameStore.js'
 import ComplaintAnalysis from '../components/case/ComplaintAnalysis.jsx'
 import LitigationActions from '../components/case/LitigationActions.jsx'
 import TimelineView from '../components/case/TimelineView.jsx'
+import CaseLog from '../components/case/CaseLog.jsx'
 import ManagingPartnerWidget from '../components/case/ManagingPartnerWidget.jsx'
 import CaseBudgetPanel from '../components/case/CaseBudgetPanel.jsx'
 import DeadlinePanel from '../components/case/DeadlinePanel.jsx'
 
-const TABS = ['Complaint Analysis', 'Litigation Actions', 'Timeline & Deadlines']
+const TABS = ['Complaint Analysis', 'Litigation Actions', 'Case Log', 'Timeline & Deadlines']
 
 export default function CaseView() {
   const { caseId } = useParams()
@@ -70,7 +71,8 @@ export default function CaseView() {
           <ComplaintAnalysis caseObject={caseObject} onEvaluated={setIssueEvaluation} />
         )}
         {activeTab === 1 && <LitigationActions caseObject={caseObject} />}
-        {activeTab === 2 && <TimelineView caseObject={caseObject} />}
+        {activeTab === 2 && <CaseLog caseObject={caseObject} />}
+        {activeTab === 3 && <TimelineView caseObject={caseObject} />}
       </div>
 
       {/* Right sidebar */}

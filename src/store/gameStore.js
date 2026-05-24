@@ -6,6 +6,7 @@ import { getSimulatedStartDate, advanceBusinessDay, formatShortDate } from '../u
 import { BILLING_RATE } from '../data/issueTypes.js'
 import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
+import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequencesEngine.js'
 
 const SAVE_KEY = 'llw_save_v1'
 
@@ -124,7 +125,15 @@ export const useGameStore = create((set, get) => ({
 
   initGame(playerName) {
     const startDate = getSimulatedStartDate()
-    const cases = FALLBACK_CASES.map(c => ({ ...c }))
+    const cases = FALLBACK_CASES.map(c => ({
+      ...c,
+      caseHealth: c.caseHealth ?? 100,
+      caseHealthEvents: c.caseHealthEvents ?? [],
+      caseOutcomeProbability: c.caseOutcomeProbability ?? { ...DEFAULT_PROBABILITY },
+      activeConsequences: c.activeConsequences ?? [],
+      consequencesTriggered: c.consequencesTriggered ?? [],
+      consequenceTimestamps: c.consequenceTimestamps ?? {},
+    }))
     const welcomeEmails = buildWelcomeEmails(playerName, startDate)
     const caseEmails = buildCaseAssignedEmails(cases, playerName, startDate)
     const newState = {
@@ -159,14 +168,19 @@ export const useGameStore = create((set, get) => ({
   advanceDay() {
     const state = get()
     const nextDate = advanceBusinessDay(state.currentDate)
+    const stateWithNextDate = { ...state, currentDate: nextDate }
 
-    // Run email engine against current state
+    // Run email engine against current state (uses original date for event keys)
     const newEmailResults = checkAndGenerateEmails(state)
     const newEmails = newEmailResults.map(r => ({ ...r.email, to: state.player.name }))
     const newEventKeys = newEmailResults.map(r => r.key)
 
+    // Run consequences engine against state with advanced date
+    const consequenceResult = evaluateConsequences(stateWithNextDate)
+    const consequenceEmails = consequenceResult.newEmails.map(e => ({ ...e, to: state.player.name }))
+
     // Check deadline notifications on all cases
-    const newNotifications = []
+    const newNotifications = [...consequenceResult.newNotifications]
     state.cases.forEach(c => {
       const daysSinceFiled = Math.round(
         (new Date(nextDate) - new Date(c.dateFiled)) / (1000 * 60 * 60 * 24)
@@ -184,11 +198,13 @@ export const useGameStore = create((set, get) => ({
 
     const updated = {
       currentDate: nextDate,
+      cases: consequenceResult.updatedCases,
       dailyActionsRemaining: state.dailyActionsTotal || 6,
       notifications: [...state.notifications, ...newNotifications],
-      emails: [...newEmails, ...(state.emails || [])],
+      emails: [...consequenceEmails, ...newEmails, ...(state.emails || [])],
       generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
       activityFeed: [
+        ...consequenceResult.newActivityEntries,
         {
           id: Date.now().toString(),
           timestamp: nextDate,
