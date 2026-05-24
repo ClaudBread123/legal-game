@@ -5,8 +5,9 @@ import { formatGameDate } from '../../utils/dateUtils.js'
 
 export default function TopBar() {
   const navigate = useNavigate()
-  const { player, currentDate, dailyActionsRemaining, emails } = useGameStore()
+  const { player, currentDate, dailyActionsRemaining, dailyActionsTotal, emails } = useGameStore()
   const unread = (emails || []).filter(e => !e.read).length
+  const total = dailyActionsTotal || 4
 
   return (
     <div style={{
@@ -34,7 +35,7 @@ export default function TopBar() {
           fontFamily: 'var(--font-mono)', fontSize: '12px',
           color: dailyActionsRemaining === 0
             ? 'var(--accent-red)'
-            : dailyActionsRemaining <= 2
+            : dailyActionsRemaining <= 1
               ? 'var(--accent-red)'
               : 'var(--text-secondary)',
           display: 'flex', alignItems: 'center', gap: '5px',
@@ -43,7 +44,7 @@ export default function TopBar() {
             <path d="M7 1.5a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 7 1.5z" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M7 4v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          {dailyActionsRemaining === 0 ? 'No actions remaining' : `${dailyActionsRemaining} actions today`}
+          {dailyActionsRemaining === 0 ? `0 / ${total} actions` : `${dailyActionsRemaining} / ${total} actions`}
         </span>
 
         {/* Nav links */}

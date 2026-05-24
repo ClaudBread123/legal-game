@@ -11,7 +11,7 @@ export const LITIGATION_ACTIONS = [
     availableWhen: 'always',
     unlocksAction: 'notice_mtd_hearing',
     deadlineTrigger: null,
-    xpReward: 30,
+    xpReward: 50,
   },
   {
     id: 'notice_mtd_hearing',
@@ -28,7 +28,7 @@ export const LITIGATION_ACTIONS = [
       warningIfMissed:
         'Opposing counsel has set your motion for a 5-minute hearing. Likelihood of denial is now very high.',
     },
-    xpReward: 20,
+    xpReward: 35,
   },
   {
     id: 'written_discovery',
@@ -39,7 +39,7 @@ export const LITIGATION_ACTIONS = [
     hours: 2.0,
     dailyActionCost: 1,
     availableWhen: 'always',
-    xpReward: 25,
+    xpReward: 40,
   },
   {
     id: 'notice_plaintiff_depo',
@@ -56,7 +56,7 @@ export const LITIGATION_ACTIONS = [
       warningIfMissed:
         'Plaintiff\'s counsel has noticed your client\'s deposition. You have lost deposition sequencing advantage.',
     },
-    xpReward: 25,
+    xpReward: 40,
   },
   {
     id: 'take_plaintiff_depo',
@@ -67,7 +67,7 @@ export const LITIGATION_ACTIONS = [
     hours: 4.0,
     dailyActionCost: 1,
     availableWhen: 'after:notice_plaintiff_depo',
-    xpReward: 35,
+    xpReward: 75,
   },
   {
     id: 'identify_expert',
@@ -83,7 +83,7 @@ export const LITIGATION_ACTIONS = [
       warningIfMissed:
         'Expert disclosure deadline has passed. Motion to exclude your expert is likely. Case is severely compromised.',
     },
-    xpReward: 20,
+    xpReward: 35,
   },
   {
     id: 'disclose_expert',
@@ -94,7 +94,7 @@ export const LITIGATION_ACTIONS = [
     hours: 1.0,
     dailyActionCost: 1,
     availableWhen: 'after:identify_expert',
-    xpReward: 20,
+    xpReward: 40,
   },
   {
     id: 'respond_to_discovery',
@@ -106,7 +106,7 @@ export const LITIGATION_ACTIONS = [
     hours: 2.5,
     dailyActionCost: 1,
     availableWhen: 'always',
-    xpReward: 15,
+    xpReward: 30,
   },
   {
     id: 'motion_summary_judgment',
@@ -118,7 +118,7 @@ export const LITIGATION_ACTIONS = [
     hours: 5.0,
     dailyActionCost: 1,
     availableWhen: 'after:take_plaintiff_depo',
-    xpReward: 50,
+    xpReward: 150,
   },
   {
     id: 'request_mediation',
@@ -129,6 +129,6 @@ export const LITIGATION_ACTIONS = [
     hours: 1.0,
     dailyActionCost: 1,
     availableWhen: 'always',
-    xpReward: 10,
+    xpReward: 20,
   },
 ]

@@ -1,18 +1,26 @@
 import { create } from 'zustand'
 import { FALLBACK_CASES } from '../data/fallbackCases.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
-import { getTitleFromXP } from '../utils/scoring.js'
+import { checkPromotionEligibility } from '../utils/scoring.js'
 import { getSimulatedStartDate, advanceBusinessDay, formatShortDate } from '../utils/dateUtils.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
 import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequencesEngine.js'
 
-const SAVE_KEY = 'llw_save_v1'
+const SAVE_KEY = 'llw_save_v2'
+const OLD_SAVE_KEY = 'llw_save_v1'
 
-function getSalaryFromTitle(title) {
-  const tier = CAREER_LADDER.find(t => t.title === title)
-  return tier ? tier.salary : 100000
+function getDailyActionsForTitle(title) {
+  switch (title) {
+    case 'Junior Associate': return 4
+    case 'Associate': return 5
+    case 'Senior Associate': return 5
+    case 'Junior Partner': return 6
+    case 'Partner': return 6
+    case 'Equity Shareholder': return 7
+    default: return 4
+  }
 }
 
 function persist(state) {
@@ -29,12 +37,22 @@ function loadSaved() {
   return null
 }
 
+function checkAndClearStale() {
+  try {
+    const old = localStorage.getItem(OLD_SAVE_KEY)
+    if (old) {
+      localStorage.removeItem(OLD_SAVE_KEY)
+      return true
+    }
+  } catch {}
+  return false
+}
+
 function makeEmailId() {
   return `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`
 }
 
 function buildWelcomeEmails(playerName, startDate) {
-  const dateStr = formatShortDate(startDate)
   return [
     {
       id: makeEmailId(),
@@ -47,9 +65,9 @@ function buildWelcomeEmails(playerName, startDate) {
       priority: 'high',
       body: `${playerName},
 
-Welcome to the governmental defense group. Your first cases have been assigned.
+Welcome to the governmental defense group. Your first case has been assigned.
 
-Review the complaints carefully — threshold issues on governmental claims must be identified immediately. Do not let deadlines pass without action.
+Review the complaint carefully — threshold issues on governmental claims must be identified immediately. Do not let deadlines pass without action.
 
 A missed §768.28(9) argument, a deficient pre-suit notice, an unrecognized federal removal hook — these are the issues that define careers here, in both directions.
 
@@ -79,32 +97,82 @@ Firm Administrator`,
   ]
 }
 
-function buildCaseAssignedEmails(cases, playerName, startDate) {
-  return cases.map(c => {
-    const data = EMAIL_TEMPLATES.case_assigned({
-      playerName,
-      caseId: c.caseId,
-      defendant: c.defendant,
-      clientName: c.clientName,
-      caseType: c.caseType,
-    })
-    return { id: makeEmailId(), timestamp: startDate, read: false, to: playerName, ...data }
+function makeCaseObject(c) {
+  return {
+    ...c,
+    caseHealth: c.caseHealth ?? 100,
+    caseHealthEvents: c.caseHealthEvents ?? [],
+    caseOutcomeProbability: c.caseOutcomeProbability ?? { ...DEFAULT_PROBABILITY },
+    activeConsequences: c.activeConsequences ?? [],
+    consequencesTriggered: c.consequencesTriggered ?? [],
+    consequenceTimestamps: c.consequenceTimestamps ?? {},
+  }
+}
+
+function buildCaseAssignedEmail(c, playerName, date) {
+  const data = EMAIL_TEMPLATES.case_assigned({
+    playerName,
+    caseId: c.caseId,
+    defendant: c.defendant,
+    clientName: c.clientName,
+    caseType: c.caseType,
   })
+  return { id: makeEmailId(), timestamp: date, read: false, to: playerName, ...data }
+}
+
+// Returns { promoEmail, promoNotification, feedEntry, newTitle } or null if no promotion
+function buildPromotionUpdate(player, currentDate, currentState) {
+  const eligibleTier = checkPromotionEligibility(player)
+  if (eligibleTier.title === player.title) return null
+
+  const promoEmailData = EMAIL_TEMPLATES.promotion({
+    playerName: player.name,
+    newTitle: eligibleTier.title,
+    effectiveDate: currentDate || 'today',
+    newSalary: eligibleTier.salary,
+  })
+
+  return {
+    newTitle: eligibleTier.title,
+    newSalary: eligibleTier.salary,
+    newLevel: CAREER_LADDER.findIndex(t => t.title === eligibleTier.title) + 1,
+    promoEmail: {
+      id: makeEmailId(),
+      timestamp: currentDate,
+      read: false,
+      to: player.name,
+      ...promoEmailData,
+    },
+    promoNotification: {
+      id: `promo-${Date.now()}`,
+      message: `Congratulations — promoted to ${eligibleTier.title}!`,
+      read: false,
+      type: 'promotion',
+      caseId: null,
+    },
+  }
+}
+
+const defaultPlayer = {
+  name: 'Joshy Llopiz',
+  title: 'Junior Associate',
+  salary: 100000,
+  xp: 0,
+  level: 1,
+  totalGameDays: 0,
+  casesWorked: 0,
+  casesWorkedIds: [],
+  totalBillableHours: 0,
 }
 
 const defaultState = {
-  player: {
-    name: 'Joshy Llopiz',
-    title: 'Junior Associate',
-    salary: 100000,
-    xp: 0,
-    level: 1,
-  },
+  player: { ...defaultPlayer },
   cases: [],
+  pendingCases: [],
   gameStarted: false,
   currentDate: null,
-  dailyActionsRemaining: 6,
-  dailyActionsTotal: 6,
+  dailyActionsRemaining: 4,
+  dailyActionsTotal: 4,
   activityFeed: [],
   notifications: [],
   timekeepingEntries: {},
@@ -114,52 +182,49 @@ const defaultState = {
   apiAvailable: true,
   emails: [],
   generatedEmailEvents: [],
+  staleGameCleared: false,
 }
 
 const saved = loadSaved()
-// Merge saved state with defaultState so new fields always have defaults
-const initialState = saved ? { ...defaultState, ...saved } : defaultState
+const staleGameCleared = !saved && checkAndClearStale()
+const initialState = saved
+  ? { ...defaultState, ...saved, staleGameCleared: false }
+  : { ...defaultState, staleGameCleared }
 
 export const useGameStore = create((set, get) => ({
   ...initialState,
 
   initGame(playerName) {
     const startDate = getSimulatedStartDate()
-    const cases = FALLBACK_CASES.map(c => ({
-      ...c,
-      caseHealth: c.caseHealth ?? 100,
-      caseHealthEvents: c.caseHealthEvents ?? [],
-      caseOutcomeProbability: c.caseOutcomeProbability ?? { ...DEFAULT_PROBABILITY },
-      activeConsequences: c.activeConsequences ?? [],
-      consequencesTriggered: c.consequencesTriggered ?? [],
-      consequenceTimestamps: c.consequenceTimestamps ?? {},
-    }))
+    const case1 = makeCaseObject(FALLBACK_CASES[0])
+    const pendingCase2 = makeCaseObject(FALLBACK_CASES[1])
+
     const welcomeEmails = buildWelcomeEmails(playerName, startDate)
-    const caseEmails = buildCaseAssignedEmails(cases, playerName, startDate)
+    const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)
+
     const newState = {
       ...defaultState,
       player: {
+        ...defaultPlayer,
         name: playerName || 'Joshy Llopiz',
-        title: 'Junior Associate',
-        salary: 100000,
-        xp: 0,
-        level: 1,
       },
-      cases,
+      cases: [case1],
+      pendingCases: [pendingCase2],
       gameStarted: true,
       currentDate: startDate,
-      dailyActionsRemaining: 6,
-      dailyActionsTotal: 6,
+      dailyActionsRemaining: 4,
+      dailyActionsTotal: 4,
       activityFeed: [
         {
           id: Date.now().toString(),
           timestamp: startDate,
-          message: `Welcome to Llopiz Wizel LLP, ${playerName}. Your caseload has been assigned.`,
+          message: `Welcome to Llopiz Wizel LLP, ${playerName}. Your first matter has been assigned.`,
           type: 'action',
         },
       ],
-      emails: [...caseEmails, ...welcomeEmails],
-      generatedEmailEvents: cases.map(c => `case_assigned_${c.caseId}`),
+      emails: [case1Email, ...welcomeEmails],
+      generatedEmailEvents: [`case_assigned_${case1.caseId}`],
+      staleGameCleared: false,
     }
     set(newState)
     persist(newState)
@@ -168,20 +233,21 @@ export const useGameStore = create((set, get) => ({
   advanceDay() {
     const state = get()
     const nextDate = advanceBusinessDay(state.currentDate)
+    const newTotalGameDays = (state.player.totalGameDays || 0) + 1
     const stateWithNextDate = { ...state, currentDate: nextDate }
 
-    // Run email engine against current state (uses original date for event keys)
+    // Run email engine
     const newEmailResults = checkAndGenerateEmails(state)
     const newEmails = newEmailResults.map(r => ({ ...r.email, to: state.player.name }))
     const newEventKeys = newEmailResults.map(r => r.key)
 
-    // Run consequences engine against state with advanced date
+    // Run consequences engine
     const consequenceResult = evaluateConsequences(stateWithNextDate)
     const consequenceEmails = consequenceResult.newEmails.map(e => ({ ...e, to: state.player.name }))
 
-    // Check deadline notifications on all cases
+    // Check deadline notifications
     const newNotifications = [...consequenceResult.newNotifications]
-    state.cases.forEach(c => {
+    consequenceResult.updatedCases.forEach(c => {
       const daysSinceFiled = Math.round(
         (new Date(nextDate) - new Date(c.dateFiled)) / (1000 * 60 * 60 * 24)
       )
@@ -196,19 +262,64 @@ export const useGameStore = create((set, get) => ({
       }
     })
 
+    // Stagger Case 2 assignment at totalGameDays === 8
+    let activeCases = consequenceResult.updatedCases
+    let pendingCases = state.pendingCases || []
+    const assignmentEmails = []
+    const assignmentActivity = []
+
+    if (newTotalGameDays === 8 && pendingCases.length > 0) {
+      const newCase = pendingCases[0]
+      activeCases = [...activeCases, newCase]
+      pendingCases = pendingCases.slice(1)
+
+      assignmentEmails.push(buildCaseAssignedEmail(newCase, state.player.name, nextDate))
+      newNotifications.push({
+        id: `case-assigned-${Date.now()}`,
+        message: `New matter assigned: ${newCase.caseId} — ${newCase.defendant}`,
+        read: false,
+        type: 'info',
+        caseId: newCase.caseId,
+      })
+      assignmentActivity.push({
+        id: `case-assign-${Date.now()}`,
+        timestamp: nextDate,
+        message: `New matter assigned: ${newCase.caseId} — ${newCase.defendant}`,
+        type: 'action',
+      })
+    }
+
+    // Promotion check after advancing the day
+    const updatedPlayerAfterDay = { ...state.player, totalGameDays: newTotalGameDays }
+    const promo = buildPromotionUpdate(updatedPlayerAfterDay, nextDate, state)
+    if (promo) {
+      newNotifications.push(promo.promoNotification)
+      assignmentEmails.push(promo.promoEmail)
+    }
+
+    const finalPlayer = promo
+      ? { ...updatedPlayerAfterDay, title: promo.newTitle, salary: promo.newSalary, level: promo.newLevel }
+      : updatedPlayerAfterDay
+
+    const dailyActions = getDailyActionsForTitle(finalPlayer.title)
+
     const updated = {
       currentDate: nextDate,
-      cases: consequenceResult.updatedCases,
-      dailyActionsRemaining: state.dailyActionsTotal || 6,
+      cases: activeCases,
+      pendingCases,
+      player: finalPlayer,
+      dailyActionsRemaining: dailyActions,
+      dailyActionsTotal: dailyActions,
       notifications: [...state.notifications, ...newNotifications],
-      emails: [...consequenceEmails, ...newEmails, ...(state.emails || [])],
+      emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...(state.emails || [])],
       generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
       activityFeed: [
+        ...assignmentActivity,
         ...consequenceResult.newActivityEntries,
         {
           id: Date.now().toString(),
           timestamp: nextDate,
-          message: `Advanced to ${nextDate}. Daily actions reset.`,
+          message: `Advanced to ${nextDate}. ${dailyActions} actions available.`,
           type: 'action',
         },
         ...state.activityFeed,
@@ -244,55 +355,32 @@ export const useGameStore = create((set, get) => ({
   addXP(amount, reason) {
     const state = get()
     const newXP = state.player.xp + amount
-    const newTitle = getTitleFromXP(newXP)
-    const newSalary = getSalaryFromTitle(newTitle)
-    const promoted = newTitle !== state.player.title
+    const updatedPlayer = { ...state.player, xp: newXP }
+    const promo = buildPromotionUpdate(updatedPlayer, state.currentDate, state)
+
     const feedEntry = {
       id: Date.now().toString(),
       timestamp: state.currentDate,
-      message: promoted
-        ? `+${amount} XP — ${reason}. PROMOTED TO ${newTitle}!`
+      message: promo
+        ? `+${amount} XP — ${reason}. PROMOTED TO ${promo.newTitle}!`
         : `+${amount} XP — ${reason}`,
       type: 'xp',
     }
+
+    const finalPlayer = promo
+      ? { ...updatedPlayer, title: promo.newTitle, salary: promo.newSalary, level: promo.newLevel }
+      : { ...updatedPlayer, title: checkPromotionEligibility(updatedPlayer).title }
+
     const updated = {
-      player: {
-        ...state.player,
-        xp: newXP,
-        title: newTitle,
-        salary: newSalary,
-        level: CAREER_LADDER.findIndex(t => t.title === newTitle) + 1,
-      },
+      player: finalPlayer,
       activityFeed: [feedEntry, ...state.activityFeed].slice(0, 50),
     }
-    if (promoted) {
-      // Add promotion notification
-      updated.notifications = [
-        {
-          id: `promo-${Date.now()}`,
-          message: `Congratulations! You have been promoted to ${newTitle}.`,
-          read: false,
-          type: 'promotion',
-          caseId: null,
-        },
-        ...(state.notifications || []),
-      ]
-      // Add promotion email
-      const promoEmailData = EMAIL_TEMPLATES.promotion({
-        playerName: state.player.name,
-        newTitle,
-        effectiveDate: state.currentDate || 'today',
-        newSalary,
-      })
-      const promoEmail = {
-        id: makeEmailId(),
-        timestamp: state.currentDate,
-        read: false,
-        to: state.player.name,
-        ...promoEmailData,
-      }
-      updated.emails = [promoEmail, ...(state.emails || [])]
+
+    if (promo) {
+      updated.notifications = [promo.promoNotification, ...(state.notifications || [])]
+      updated.emails = [promo.promoEmail, ...(state.emails || [])]
     }
+
     set(updated)
     persist({ ...state, ...updated })
   },
@@ -363,14 +451,18 @@ export const useGameStore = create((set, get) => ({
     const amount = hours * BILLING_RATE
     const dateKey = state.currentDate
     const existingEntries = state.timekeepingEntries[dateKey] || []
-    const newEntry = {
-      id: `tk-${Date.now()}`,
-      caseId,
-      description,
-      hours,
-      amount,
+    const newEntry = { id: `tk-${Date.now()}`, caseId, description, hours, amount }
+
+    const updatedPlayer = {
+      ...state.player,
+      totalBillableHours: (state.player.totalBillableHours || 0) + hours,
     }
+    const promo = buildPromotionUpdate(updatedPlayer, state.currentDate, state)
+
     const updated = {
+      player: promo
+        ? { ...updatedPlayer, title: promo.newTitle, salary: promo.newSalary, level: promo.newLevel }
+        : updatedPlayer,
       cases: state.cases.map(c =>
         c.caseId === caseId
           ? { ...c, hoursBilled: (c.hoursBilled || 0) + hours, amountBilled: (c.amountBilled || 0) + amount }
@@ -382,6 +474,12 @@ export const useGameStore = create((set, get) => ({
       },
       monthlyBillableHours: state.monthlyBillableHours + hours,
     }
+
+    if (promo) {
+      updated.notifications = [promo.promoNotification, ...(state.notifications || [])]
+      updated.emails = [promo.promoEmail, ...(state.emails || [])]
+    }
+
     set(updated)
     persist({ ...state, ...updated })
   },
@@ -401,7 +499,25 @@ export const useGameStore = create((set, get) => ({
     if (!caseObj) return
     const alreadyDone = (caseObj.completedActions || []).includes(actionId)
     if (alreadyDone) return
+
+    // Track casesWorked
+    const workedIds = state.player.casesWorkedIds || []
+    const newCasesWorked = workedIds.includes(caseId)
+      ? state.player.casesWorked
+      : (state.player.casesWorked || 0) + 1
+    const newWorkedIds = workedIds.includes(caseId) ? workedIds : [...workedIds, caseId]
+
+    const updatedPlayer = {
+      ...state.player,
+      casesWorked: newCasesWorked,
+      casesWorkedIds: newWorkedIds,
+    }
+    const promo = buildPromotionUpdate(updatedPlayer, state.currentDate, state)
+
     const updated = {
+      player: promo
+        ? { ...updatedPlayer, title: promo.newTitle, salary: promo.newSalary, level: promo.newLevel }
+        : updatedPlayer,
       cases: state.cases.map(c =>
         c.caseId === caseId
           ? {
@@ -415,6 +531,12 @@ export const useGameStore = create((set, get) => ({
           : c
       ),
     }
+
+    if (promo) {
+      updated.notifications = [promo.promoNotification, ...(state.notifications || [])]
+      updated.emails = [promo.promoEmail, ...(state.emails || [])]
+    }
+
     set(updated)
     persist({ ...state, ...updated })
   },
@@ -428,6 +550,6 @@ export const useGameStore = create((set, get) => ({
 
   resetGame() {
     localStorage.removeItem(SAVE_KEY)
-    set(defaultState)
+    set({ ...defaultState })
   },
 }))

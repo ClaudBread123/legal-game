@@ -1,6 +1,6 @@
 import { callClaude } from './anthropicProxy.js'
 
-const XP_MAP = { critical: 50, major: 25, minor: 10 }
+const XP_MAP = { critical: 100, major: 50, minor: 20 }
 
 function has1983Claim(caseObject) {
   return (caseObject.claimsAsserted || []).some(c => c.includes('1983'))
@@ -110,7 +110,7 @@ function localEvaluate(caseObject, selectedIssueIds) {
   }
 
   const gained = correctlyIdentified.reduce((s, i) => s + i.xpAwarded, 0)
-  const deducted = incorrectlyFlagged.length * 5
+  const deducted = incorrectlyFlagged.length * 10
   const totalXP = Math.max(0, gained - deducted)
   const requiresMPReview = missed.some(m => m.severity === 'critical')
 
@@ -155,7 +155,7 @@ Return JSON:
   "requiresMPReview": boolean
 }
 
-XP awards: critical issue identified = 50, major = 25, minor = 10. XP deductions: incorrectly flagged = -5 each (not legallyNuanced).`
+XP awards: critical issue identified = 100, major = 50, minor = 20. XP deductions: incorrectly flagged = -10 each (not legallyNuanced).`
 
   try {
     const text = await callClaude({ system, userMessage, maxTokens: 1400 })

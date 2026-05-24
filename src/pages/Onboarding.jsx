@@ -115,7 +115,7 @@ function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
 }
 
 export default function Onboarding({ onReady }) {
-  const { initGame, resetGame, player, currentDate, gameStarted } = useGameStore()
+  const { initGame, resetGame, player, currentDate, gameStarted, staleGameCleared } = useGameStore()
   const [name, setName] = useState('Joshy Llopiz')
 
   // Existing save → show welcome-back screen
@@ -176,12 +176,22 @@ export default function Onboarding({ onReady }) {
         </h1>
         <p style={{
           fontSize: '16px', color: 'var(--text-secondary)', lineHeight: '1.7',
-          fontFamily: 'var(--font-sans)', marginBottom: '36px',
+          fontFamily: 'var(--font-sans)', marginBottom: staleGameCleared ? '20px' : '36px',
         }}>
           You have been assigned to the governmental defense practice group at Llopiz
           Wizel LLP. Your caseload is waiting. Your reputation is unwritten. The firm
           expects excellence — particularly on threshold issues that others miss.
         </p>
+
+        {staleGameCleared && (
+          <div style={{
+            background: 'rgba(201,168,76,0.08)', border: '1px solid var(--accent-gold)44',
+            borderRadius: '6px', padding: '12px 16px', marginBottom: '24px',
+            fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)', lineHeight: '1.5',
+          }}>
+            Game updated with new content. Please start a new game to continue.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <label style={{
