@@ -2,8 +2,6 @@ import { useGameStore } from '../store/gameStore.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
 import { getXPProgress, getNextTitle } from '../utils/scoring.js'
-import XPBar from '../components/shared/XPBar.jsx'
-
 export default function Career() {
   const { player, cases, monthlyBillableHours } = useGameStore()
   const { percentage, nextThreshold } = getXPProgress(player.xp)
@@ -66,7 +64,8 @@ export default function Career() {
               display: 'flex', alignItems: 'center', gap: '12px',
               padding: '12px', borderRadius: '6px',
               background: isCurrent ? 'rgba(201,168,76,0.1)' : 'transparent',
-              border: isCurrent ? '1px solid rgba(201,168,76,0.3)' : '1px solid transparent',
+              border: '1px solid transparent',
+              borderLeft: isCurrent ? '3px solid var(--accent-gold)' : `3px solid ${isPast ? tier.color + '66' : 'var(--border)'}`,
               marginBottom: '4px', opacity: isPast ? 1 : 0.5,
             }}>
               <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: isPast ? tier.color : 'var(--border)', flexShrink: 0 }} />

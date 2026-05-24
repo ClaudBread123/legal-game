@@ -49,7 +49,8 @@ const defaultState = {
 }
 
 const saved = loadSaved()
-const initialState = saved || defaultState
+// Merge saved state with defaultState so new fields always have defaults
+const initialState = saved ? { ...defaultState, ...saved } : defaultState
 
 export const useGameStore = create((set, get) => ({
   ...initialState,
@@ -70,6 +71,7 @@ export const useGameStore = create((set, get) => ({
       gameStarted: true,
       currentDate: startDate,
       dailyActionsRemaining: 6,
+      dailyActionsTotal: 6,
       activityFeed: [
         {
           id: Date.now().toString(),
@@ -104,7 +106,7 @@ export const useGameStore = create((set, get) => ({
     })
     const updated = {
       currentDate: nextDate,
-      dailyActionsRemaining: 6,
+      dailyActionsRemaining: state.dailyActionsTotal || 6,
       notifications: [...state.notifications, ...newNotifications],
       activityFeed: [
         {

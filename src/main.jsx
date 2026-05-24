@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useGameStore } from './store/gameStore.js'
@@ -13,8 +13,13 @@ import './styles/globals.css'
 
 function Root() {
   const { gameStarted } = useGameStore()
+  // Session flag: true once the user clicks Continue or completes onboarding
+  const [sessionReady, setSessionReady] = useState(false)
 
-  if (!gameStarted) return <Onboarding />
+  if (!gameStarted || !sessionReady) {
+    return <Onboarding onReady={() => setSessionReady(true)} />
+  }
+
   return (
     <AppShell>
       <Routes>

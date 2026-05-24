@@ -1,15 +1,58 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore.js'
 import { ISSUE_TYPES } from '../../data/issueTypes.js'
 import { evaluateIssueAnalysis } from '../../api/evaluateIssues.js'
+import { getMPReview } from '../../api/managingPartner.js'
+import Modal from '../shared/Modal.jsx'
+
+function useCountUp(target, duration = 1500) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    if (!target) return
+    const start = Date.now()
+    const tick = () => {
+      const elapsed = Date.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out
+      setValue(Math.round(target * (1 - Math.pow(1 - progress, 3))))
+      if (progress < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [target, duration])
+  return value
+}
+
+function XPCountUp({ total }) {
+  const displayed = useCountUp(total)
+  return (
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+      style={{
+        textAlign: 'center', padding: '16px',
+        background: 'rgba(201,168,76,0.1)', borderRadius: '6px', marginBottom: '12px',
+      }}
+    >
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '4px' }}>
+        TOTAL XP EARNED
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '32px', color: 'var(--accent-gold)', fontWeight: 700 }}>
+        +{displayed}
+      </div>
+    </motion.div>
+  )
+}
 
 export default function ComplaintAnalysis({ caseObject }) {
-  const { player, addXP, logActivity, addMPMessage, addNotification } = useGameStore()
+  const { player, currentDate, addXP, logActivity, addMPMessage, addNotification } = useGameStore()
   const [selected, setSelected] = useState([])
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [tooltip, setTooltip] = useState(null)
+  const [mpModal, setMpModal] = useState(null)
+  const [mpLoading, setMpLoading] = useState(false)
 
   const toggle = id => {
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
@@ -24,19 +67,40 @@ export default function ComplaintAnalysis({ caseObject }) {
       })
       setResult(eval_)
       if (eval_.totalXP > 0) {
-        addXP(eval_.totalXP, `Issue analysis on ${caseObject.caseId}`)
+        addXP(eval_.totalXP, `Issue analysis — ${caseObject.caseId}`)
       }
-      logActivity(`Completed issue analysis for ${caseObject.caseId}`, 'action')
+      logActivity(`Issue analysis completed for ${caseObject.caseId}`, 'action')
       if (eval_.requiresMPReview) {
         addNotification(
-          `Managing Partner review required on ${caseObject.caseId} — critical issues were missed.`,
+          `MP review required on ${caseObject.caseId} — critical issues were missed.`,
           'warning', caseObject.caseId
         )
+        addMPMessage(caseObject.caseId, `[Pending review — critical issues missed on intake analysis]`)
       }
     } finally {
       setLoading(false)
     }
   }
+
+  const requestMPMemo = async () => {
+    if (mpLoading) return
+    setMpLoading(true)
+    try {
+      const content = await getMPReview({
+        caseObject,
+        issueEvaluation: result,
+        completedActions: caseObject.completedActions || [],
+        playerName: player.name,
+      })
+      setMpModal(content)
+      addMPMessage(caseObject.caseId, content)
+    } finally {
+      setMpLoading(false)
+    }
+  }
+
+  const ISSUE_LABEL_MAP = Object.fromEntries(ISSUE_TYPES.map(i => [i.id, i.label]))
+  const STATUTE_MAP = Object.fromEntries(ISSUE_TYPES.map(i => [i.id, i.statute]))
 
   return (
     <div>
@@ -109,6 +173,7 @@ export default function ComplaintAnalysis({ caseObject }) {
                   border: `2px solid ${selected.includes(issue.id) ? 'var(--accent-gold)' : 'var(--border)'}`,
                   background: selected.includes(issue.id) ? 'var(--accent-gold)' : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 150ms ease',
                 }}>
                   {selected.includes(issue.id) && (
                     <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
@@ -130,7 +195,7 @@ export default function ComplaintAnalysis({ caseObject }) {
                     background: 'none', border: '1px solid var(--border)', borderRadius: '50%',
                     width: '18px', height: '18px', fontSize: '10px', color: 'var(--text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    marginTop: '2px',
+                    marginTop: '2px', cursor: 'pointer',
                   }}
                 >
                   i
@@ -179,83 +244,190 @@ export default function ComplaintAnalysis({ caseObject }) {
               background: 'var(--bg-secondary)', border: '1px solid var(--border)',
               borderRadius: '8px', padding: '24px', marginTop: '16px',
             }}>
-              <div style={{ textAlign: 'center', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', letterSpacing: '0.1em', color: 'var(--text-primary)' }}>
+              {/* Memo header */}
+              <div style={{
+                textAlign: 'center', marginBottom: '20px', paddingBottom: '16px',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', letterSpacing: '0.15em', color: 'var(--text-primary)' }}>
                   MEMORANDUM
                 </div>
-                <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)', lineHeight: '1.8' }}>
-                  <div>TO: {player.name}</div>
-                  <div>FROM: Senior Partner Review</div>
-                  <div>RE: Issue Analysis — {caseObject.caseId}</div>
+                <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)', lineHeight: '1.9', textAlign: 'left', display: 'inline-block' }}>
+                  <div><span style={{ color: 'var(--text-muted)' }}>TO:</span> {player.name}, {player.title}</div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>FROM:</span> Case Analysis System</div>
+                  <div><span style={{ color: 'var(--text-muted)' }}>RE:</span> Issue Analysis — {caseObject.caseId}</div>
+                  {currentDate && <div><span style={{ color: 'var(--text-muted)' }}>DATE:</span> {currentDate}</div>}
                 </div>
               </div>
 
+              {/* ✓ Correctly identified */}
               {result.correctlyIdentified?.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--accent-green)', letterSpacing: '0.1em', marginBottom: '8px', fontWeight: 600 }}>
-                    CORRECTLY IDENTIFIED ({result.correctlyIdentified.length})
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent-green)', letterSpacing: '0.1em', marginBottom: '10px', fontWeight: 600 }}>
+                    ✓ ISSUES CORRECTLY IDENTIFIED ({result.correctlyIdentified.length})
                   </div>
                   {result.correctlyIdentified.map(item => (
-                    <div key={item.issueId} style={{ padding: '8px', background: 'rgba(76,175,130,0.08)', borderRadius: '6px', marginBottom: '6px' }}>
-                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.issueId}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>{item.feedback}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--accent-green)', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>+{item.xpAwarded} XP</div>
+                    <div key={item.issueId} style={{
+                      padding: '10px 12px', background: 'rgba(76,175,130,0.08)',
+                      borderLeft: '3px solid var(--accent-green)', borderRadius: '0 6px 6px 0',
+                      marginBottom: '8px',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                          {ISSUE_LABEL_MAP[item.issueId] || item.issueId}
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent-green)', flexShrink: 0, marginLeft: '12px' }}>
+                          +{item.xpAwarded} XP
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+                        {STATUTE_MAP[item.issueId]}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                        {item.feedback}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
+              {/* ✗ Missed */}
               {result.missed?.length > 0 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--accent-red)', letterSpacing: '0.1em', marginBottom: '8px', fontWeight: 600 }}>
-                    MISSED ISSUES ({result.missed.length})
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent-red)', letterSpacing: '0.1em', marginBottom: '10px', fontWeight: 600 }}>
+                    ✗ ISSUES MISSED ({result.missed.length})
                   </div>
                   {result.missed.map(item => (
-                    <div key={item.issueId} style={{ padding: '8px', background: 'rgba(224,82,82,0.08)', borderLeft: '3px solid var(--accent-red)', borderRadius: '0 6px 6px 0', marginBottom: '6px' }}>
-                      <div style={{ fontSize: '13px', color: 'var(--accent-red)', fontWeight: 500 }}>{item.issueId}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', margin: '2px 0' }}>{item.statute}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>{item.description}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--accent-red)', marginTop: '3px', fontStyle: 'italic' }}>{item.consequence}</div>
+                    <div key={item.issueId} style={{
+                      padding: '10px 12px', background: 'rgba(224,82,82,0.07)',
+                      borderLeft: '3px solid var(--accent-red)', borderRadius: '0 6px 6px 0',
+                      marginBottom: '8px',
+                    }}>
+                      <div style={{ fontSize: '13px', color: 'var(--accent-red)', fontWeight: 600, marginBottom: '3px' }}>
+                        {ISSUE_LABEL_MAP[item.issueId] || item.issueId}
+                        <span style={{
+                          marginLeft: '8px', fontSize: '10px', background: 'var(--accent-red)',
+                          color: '#fff', borderRadius: '3px', padding: '1px 5px', verticalAlign: 'middle',
+                        }}>
+                          {item.severity?.toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '6px' }}>
+                        {item.statute || STATUTE_MAP[item.issueId]}
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '6px' }}>
+                        {item.description}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--accent-red)', fontStyle: 'italic', lineHeight: '1.5' }}>
+                        Consequence: {item.consequence}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '6px', marginBottom: '16px' }}>
+              {/* ⚠ Incorrectly flagged */}
+              {result.incorrectlyFlagged?.length > 0 && (
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent-yellow)', letterSpacing: '0.1em', marginBottom: '10px', fontWeight: 600 }}>
+                    ⚠ INCORRECTLY FLAGGED ({result.incorrectlyFlagged.length}) — −{result.incorrectlyFlagged.length * 5} XP
+                  </div>
+                  {result.incorrectlyFlagged.map(item => (
+                    <div key={item.issueId} style={{
+                      padding: '8px 12px', background: 'rgba(240,180,41,0.07)',
+                      borderLeft: '3px solid var(--accent-yellow)', borderRadius: '0 6px 6px 0',
+                      marginBottom: '6px',
+                    }}>
+                      <div style={{ fontSize: '13px', color: 'var(--accent-yellow)', marginBottom: '3px' }}>
+                        {ISSUE_LABEL_MAP[item.issueId] || item.issueId}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.reason}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Assessment */}
+              <div style={{
+                padding: '12px', background: 'var(--bg-card)', borderRadius: '6px',
+                marginBottom: '16px',
+              }}>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
                   {result.overallAssessment}
                 </div>
               </div>
 
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                style={{ textAlign: 'center', padding: '12px', background: 'rgba(201,168,76,0.1)', borderRadius: '6px' }}
-              >
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', color: 'var(--accent-gold)' }}>
-                  +{result.totalXP} XP
-                </div>
-              </motion.div>
+              {/* XP count-up */}
+              <XPCountUp total={result.totalXP} />
 
+              {/* MP review trigger */}
               {result.requiresMPReview && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [1, 0.5, 1] }}
-                  transition={{ repeat: 3, duration: 0.6, delay: 0.5 }}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
                   style={{
-                    marginTop: '12px', padding: '10px', background: 'rgba(224,82,82,0.12)',
+                    padding: '14px 16px', background: 'rgba(224,82,82,0.1)',
                     border: '1px solid var(--accent-red)', borderRadius: '6px',
-                    textAlign: 'center', fontSize: '13px', color: 'var(--accent-red)', fontWeight: 600,
                   }}
                 >
-                  ⚠ Managing Partner Review Triggered — critical issues were missed
+                  <motion.div
+                    animate={{ opacity: [1, 0.5, 1] }}
+                    transition={{ repeat: 3, duration: 0.8, delay: 0.6 }}
+                    style={{ fontSize: '13px', color: 'var(--accent-red)', fontWeight: 700, marginBottom: '4px' }}
+                  >
+                    ⚠ MANAGING PARTNER REVIEW TRIGGERED
+                  </motion.div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                    Rafael Llopiz has flagged this case for immediate review. Critical issues were missed on intake.
+                  </div>
+                  <button
+                    onClick={requestMPMemo}
+                    disabled={mpLoading}
+                    style={{
+                      background: 'var(--accent-red)', color: '#fff', border: 'none',
+                      borderRadius: '6px', padding: '8px 16px', fontSize: '13px',
+                      fontFamily: 'var(--font-serif)', fontWeight: 600,
+                      cursor: mpLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {mpLoading ? 'Loading…' : 'Read Managing Partner Memo'}
+                  </button>
                 </motion.div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* MP Modal */}
+      <Modal isOpen={!!mpModal} onClose={() => setMpModal(null)} title="CASE REVIEW" wide>
+        {mpModal && (
+          <div>
+            <div style={{ marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                {currentDate}
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--accent-gold)', fontFamily: 'var(--font-serif)', marginTop: '4px' }}>
+                Rafael Llopiz, Managing Partner
+              </div>
+              <div style={{ width: '40px', height: '2px', background: 'var(--accent-gold)', marginTop: '12px' }} />
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-serif)', fontSize: '14px', color: 'var(--text-secondary)',
+              lineHeight: '1.9', whiteSpace: 'pre-wrap',
+            }}>
+              {mpModal}
+            </div>
+            <div style={{
+              marginTop: '20px', paddingTop: '14px', borderTop: '1px solid var(--border)',
+              fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic',
+            }}>
+              This review has been logged to your file.
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

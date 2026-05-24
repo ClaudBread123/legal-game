@@ -1,19 +1,143 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import FirmLogo from '../components/shared/FirmLogo.jsx'
+import { formatGameDate } from '../utils/dateUtils.js'
 
-export default function Onboarding() {
-  const navigate = useNavigate()
-  const { initGame } = useGameStore()
+function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
+  const [confirming, setConfirming] = useState(false)
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '24px',
+    }}>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        style={{ textAlign: 'center', maxWidth: '420px', width: '100%' }}
+      >
+        <FirmLogo size="md" />
+        <div style={{ width: '40px', height: '1px', background: 'var(--accent-gold)', margin: '20px auto' }} />
+
+        <h2 style={{
+          fontFamily: 'var(--font-serif)', fontSize: '28px', margin: '0 0 6px',
+          color: 'var(--text-primary)',
+        }}>
+          Welcome back, {player.name}.
+        </h2>
+        <div style={{ fontSize: '16px', color: 'var(--accent-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
+          {player.title}
+        </div>
+        <div style={{
+          fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
+          marginBottom: '28px',
+        }}>
+          {player.xp} XP
+        </div>
+
+        {!confirming ? (
+          <>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+              <button
+                onClick={onContinue}
+                style={{
+                  flex: 1, height: '48px',
+                  background: 'var(--accent-gold)', color: '#0f1117',
+                  border: 'none', borderRadius: '6px',
+                  fontFamily: 'var(--font-serif)', fontSize: '15px', fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setConfirming(true)}
+                style={{
+                  flex: 1, height: '48px',
+                  background: 'transparent', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)', borderRadius: '6px',
+                  fontFamily: 'var(--font-sans)', fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                New Game
+              </button>
+            </div>
+            {currentDate && (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                Last played: {formatGameDate(currentDate)}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{
+            background: 'var(--bg-card)', border: '1px solid var(--accent-red)',
+            borderRadius: '8px', padding: '20px',
+          }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Start over?{' '}
+              <span style={{ color: 'var(--accent-red)' }}>All progress will be lost.</span>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={onNewGame}
+                style={{
+                  flex: 1, height: '40px',
+                  background: 'var(--accent-red)', color: '#fff',
+                  border: 'none', borderRadius: '6px',
+                  fontFamily: 'var(--font-sans)', fontSize: '13px', fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Confirm — Erase Save
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{
+                  flex: 1, height: '40px',
+                  background: 'none', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)', borderRadius: '6px',
+                  fontFamily: 'var(--font-sans)', fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  )
+}
+
+export default function Onboarding({ onReady }) {
+  const { initGame, resetGame, player, currentDate, gameStarted } = useGameStore()
   const [name, setName] = useState('Joshy Llopiz')
+
+  // Existing save → show welcome-back screen
+  if (gameStarted) {
+    return (
+      <WelcomeBack
+        player={player}
+        currentDate={currentDate}
+        onContinue={() => onReady && onReady()}
+        onNewGame={() => {
+          resetGame()
+          window.location.reload()
+        }}
+      />
+    )
+  }
 
   const handleSubmit = e => {
     e.preventDefault()
     if (!name.trim()) return
     initGame(name.trim())
-    navigate('/')
+    if (onReady) onReady()
   }
 
   return (
@@ -29,7 +153,10 @@ export default function Onboarding() {
         style={{ textAlign: 'center', marginBottom: '40px' }}
       >
         <FirmLogo size="lg" />
-        <div style={{ marginTop: '12px', fontSize: '14px', color: 'var(--text-secondary)', fontStyle: 'italic', fontFamily: 'var(--font-sans)' }}>
+        <div style={{
+          marginTop: '12px', fontSize: '14px', color: 'var(--text-secondary)',
+          fontStyle: 'italic', fontFamily: 'var(--font-sans)',
+        }}>
           Florida's Premier Governmental Defense Firm
         </div>
         <div style={{ width: '60px', height: '2px', background: 'var(--accent-gold)', margin: '20px auto 0' }} />
@@ -60,7 +187,7 @@ export default function Onboarding() {
           <label style={{
             display: 'block', fontSize: '11px', color: 'var(--text-secondary)',
             letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px',
-            fontFamily: 'var(--font-sans)', fontVariant: 'small-caps',
+            fontFamily: 'var(--font-sans)',
           }}>
             What is your name?
           </label>
