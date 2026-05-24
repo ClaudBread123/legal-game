@@ -44,7 +44,7 @@ export default function ManagingPartnerWidget({ caseObject, issueEvaluation }) {
           <circle cx="28" cy="28" r="3" fill="#c9a84c" />
         </svg>
         <div style={{ fontFamily: 'var(--font-serif)', fontSize: '14px', color: 'var(--text-primary)' }}>
-          Rafael Llopiz
+          Onier Llopiz
         </div>
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
           Managing Partner

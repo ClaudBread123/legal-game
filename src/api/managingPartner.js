@@ -11,7 +11,7 @@ In this case, the individual defendant must be dismissed. Filing a motion to dis
 
 In governmental defense practice, §768.28(9) is as automatic as checking for a statute of limitations. It must be in your muscle memory. I do not want to have this conversation again.
 
-— R. Llopiz`,
+— OL`,
 
   federal_removal_1983: playerName => `${playerName},
 
@@ -23,7 +23,7 @@ Federal court gives us qualified immunity arguments, Eleventh Amendment consider
 
 Evaluate removal immediately on every §1983 case. Count the days from service. It is the first call you make.
 
-— R. Llopiz`,
+— OL`,
 
   insufficient_presuit_notice: playerName => `${playerName},
 
@@ -35,7 +35,7 @@ If the notice was insufficient — wrong entity, wrong form, untimely — that i
 
 Check it on day one. Every time. This is not optional research — it is the threshold you walk through before you open the case file.
 
-— R. Llopiz`,
+— OL`,
 
   sovereign_immunity_bar: playerName => `${playerName},
 
@@ -47,7 +47,7 @@ The line is not always obvious. A decision to operate a single park ranger over 
 
 Do not assume that because a governmental entity is named, all its conduct is exposed. Analyze each act alleged and place it on the discretionary/operational spectrum. The ones that fall on the discretionary side belong in your motion to dismiss.
 
-— R. Llopiz`,
+— OL`,
 
   statute_of_limitations: playerName => `${playerName},
 
@@ -57,7 +57,7 @@ Determine the accrual date. Accrual is typically when the plaintiff knew or shou
 
 A limitations defense raised late — or not raised at all — is malpractice. It is one of the few defenses that, if waived, cannot be revived. Get it right on intake, every time.
 
-— R. Llopiz`,
+— OL`,
 
   hb145_cap_applicability: playerName => `${playerName},
 
@@ -69,7 +69,7 @@ You must determine the accrual date on every governmental tort file and apply th
 
 Also note: §1983 claims are not subject to the sovereign immunity caps at all. Federal civil rights exposure is uncapped. If there is a federal claim in the complaint, the cap analysis only applies to the state tort claims.
 
-— R. Llopiz`,
+— OL`,
 
   hb145_notice_window: playerName => `${playerName},
 
@@ -81,7 +81,7 @@ Verify the notice on every file: was it presented in writing, to the correct gov
 
 Do not skip this step because the complaint looks otherwise solid on the merits. A procedurally barred claim does not get to the merits.
 
-— R. Llopiz`,
+— OL`,
 
   wrong_venue: playerName => `${playerName},
 
@@ -89,7 +89,7 @@ Venue in actions against governmental entities is governed by §768.28(1). The a
 
 If the plaintiff filed in the wrong county, that is grounds for a motion to transfer — not dismissal, but transfer. The distinction matters. Evaluate immediately. Venue errors can sometimes be waived if not raised promptly.
 
-— R. Llopiz`,
+— OL`,
 
   admin_exhaustion: playerName => `${playerName},
 
@@ -97,7 +97,7 @@ Failure to exhaust administrative remedies is a jurisdictional bar in several ca
 
 Check whether exhaustion was required for each claim in this complaint. If the plaintiff filed in circuit court without completing the required administrative process, you have a motion to dismiss for lack of subject matter jurisdiction. Jurisdiction defects cannot be waived and can be raised at any time.
 
-— R. Llopiz`,
+— OL`,
 
   duplicative_counts: playerName => `${playerName},
 
@@ -105,7 +105,7 @@ Duplicative counts asserting the same legal theory against the same defendant ar
 
 Identify and move to strike the redundant counts. Keep the complaint to what plaintiff can actually prove.
 
-— R. Llopiz`,
+— OL`,
 
   _general: playerName => `${playerName},
 
@@ -115,7 +115,7 @@ Review §768.28 carefully. Identify every named defendant and evaluate their sta
 
 These are not advanced techniques. They are the baseline. I expect them on every file.
 
-— R. Llopiz`,
+— OL`,
 }
 
 const SEVERITY_ORDER = ['critical', 'major', 'minor']
@@ -129,7 +129,7 @@ Your issue identification was thorough on intake. That is the baseline expectati
 
 Push forward on discovery sequencing and get the motion to dismiss on file. I'll expect an update after the hearing is set.
 
-— R. Llopiz`
+— OL`
   }
 
   // Sort missed by severity
@@ -160,7 +160,7 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 }
 
 export async function getMPReview({ caseObject, issueEvaluation, completedActions, playerName }) {
-  const system = `You are Rafael Llopiz, founding partner of Llopiz Wizel LLP, a Florida firm specializing in governmental defense. You are conducting a case review with your associate ${playerName}. You are direct, experienced, and deeply knowledgeable about Florida governmental tort law, sovereign immunity, §768.28, and the Florida Rules of Civil Procedure. You educate through consequence — you explain not just what was missed, but what will happen because it was missed. You are not cruel, but you are unsparing. You always cite specific statutes and procedural rules. Your reviews are 4-6 paragraphs. Speak directly to the associate by name. Sign off as "— R. Llopiz".`
+  const system = `You are Onier Llopiz, founding partner of Llopiz Wizel LLP, a Florida firm specializing in governmental defense. You are conducting a case review with your associate ${playerName}. You are direct, experienced, and deeply knowledgeable about Florida governmental tort law, sovereign immunity, §768.28, and the Florida Rules of Civil Procedure. You educate through consequence — you explain not just what was missed, but what will happen because it was missed. You are not cruel, but you are unsparing. You always cite specific statutes and procedural rules. Your reviews are 4-6 paragraphs. Speak directly to the associate by name. Sign off as "— OL".`
 
   const userMessage = `Review this case with the associate.
 

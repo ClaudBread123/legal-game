@@ -1,7 +1,7 @@
 export const EMAIL_TEMPLATES = {
   case_assigned: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `New Matter Assigned: ${ctx.caseId} — ${ctx.defendant}`,
     body: `${ctx.playerName},
 
@@ -15,13 +15,13 @@ I have reviewed the intake file. There are threshold issues that require your im
 
 I expect your initial issue analysis on my desk within 48 hours.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 
   mtd_hearing_warning: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `URGENT: Set MTD Hearing — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -31,7 +31,7 @@ Opposing counsel is watching. If you do not set this hearing immediately with ad
 
 Set the hearing today. Request a date at least 3 weeks out and no less than 30 minutes. Do not let this slip.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
@@ -52,8 +52,8 @@ Plaintiff's Counsel`,
   }),
 
   depo_sequencing_warning: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Deposition Sequencing — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -63,7 +63,7 @@ We always depose the plaintiff before opposing counsel deposes our client. Alway
 
 Notice the plaintiff's deposition immediately.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 
@@ -83,8 +83,8 @@ ${ctx.opposingCounsel}`,
   }),
 
   discovery_overdue: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Discovery Status — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -94,13 +94,13 @@ Interrogatories, requests for production, and requests for admissions should hav
 
 Get this done.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 
   expert_deadline_warning: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Expert Disclosure Deadline Approaching — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -110,13 +110,13 @@ Missing expert disclosure is frequently case-dispositive. A motion to exclude a 
 
 Identify and retain an appropriate expert immediately. The retention process takes time — do not wait.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
   rfa_deadline_warning: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `RFA Response Deadline — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -126,7 +126,7 @@ I cannot stress this enough: do not miss this deadline. Under Florida Rule of Ci
 
 Respond immediately.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
@@ -172,8 +172,8 @@ Firm Administrator`,
   }),
 
   monthly_performance_low: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Monthly Billable Hours — ${ctx.month}`,
     body: `${ctx.playerName},
 
@@ -183,25 +183,25 @@ The target range is 165–200 hours per month. Falling below 165 hours consisten
 
 I want to see improvement next month.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 
   monthly_performance_good: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Monthly Performance — ${ctx.month}`,
     body: `${ctx.playerName},
 
 ${ctx.hours} billable hours for ${ctx.month}. That is within our target range. Keep it up.
 
-— RL`,
+— OL`,
     priority: 'normal',
   }),
 
   mtd_denied_consequence: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Motion to Dismiss Denied — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -213,13 +213,13 @@ The grounds we raised are not gone entirely — some can be renewed at summary j
 
 Case health is now significantly compromised. I want a revised litigation plan on my desk immediately.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
   expert_excluded_consequence: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `URGENT: Expert Excluded — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -229,13 +229,13 @@ This is a serious, potentially case-dispositive error. Proceeding to summary jud
 
 I need to meet with you today. This needs to be reported to the client immediately.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
   rfa_deemed_consequence: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `RFAs Deemed Admitted — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -245,13 +245,13 @@ Do you understand what this means? Plaintiff has now established — by our own 
 
 This is the kind of error that ends careers. I am scheduling an immediate case review.
 
-— RL`,
+— OL`,
     priority: 'urgent',
   }),
 
   removal_waived_consequence: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `Federal Removal Deadline Passed — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -261,7 +261,7 @@ This case contains claims under 42 U.S.C. §1983. Federal court was the correct 
 
 We are now committed to state court. Adjust the litigation strategy accordingly. I want to discuss this at your earliest availability.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 
@@ -282,8 +282,8 @@ Please submit your evaluation today. If you have questions on the format, see th
   }),
 
   preservation_missed: ctx => ({
-    from: 'Rafael Llopiz',
-    fromEmail: 'r.llopiz@llopizwizel.com',
+    from: 'Onier Llopiz',
+    fromEmail: 'o.llopiz@llopizwizel.com',
     subject: `No Preservation Letter Sent — ${ctx.caseId}`,
     body: `${ctx.playerName},
 
@@ -295,7 +295,7 @@ A spoliation argument requires a prior preservation demand. We no longer have a 
 
 Send the preservation letter today. Document everything you have already found before anything else disappears.
 
-— RL`,
+— OL`,
     priority: 'high',
   }),
 }

@@ -59,8 +59,8 @@ function buildWelcomeEmails(playerName, startDate) {
       id: makeEmailId(),
       timestamp: startDate,
       read: false,
-      from: 'Rafael Llopiz',
-      fromEmail: 'r.llopiz@llopizwizel.com',
+      from: 'Onier Llopiz',
+      fromEmail: 'o.llopiz@llopizwizel.com',
       to: playerName,
       subject: 'Welcome to the Practice Group',
       priority: 'high',
@@ -74,7 +74,7 @@ A missed §768.28(9) argument, a deficient pre-suit notice, an unrecognized fede
 
 My door is open.
 
-— RL`,
+— OL`,
     },
     {
       id: makeEmailId(),
@@ -538,6 +538,28 @@ export const useGameStore = create((set, get) => ({
       updated.emails = [promo.promoEmail, ...(state.emails || [])]
     }
 
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  setExpertType(caseId, expertTypeId) {
+    const state = get()
+    const updated = {
+      cases: state.cases.map(c =>
+        c.caseId === caseId ? { ...c, selectedExpertType: expertTypeId } : c
+      ),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  setExpertCandidate(caseId, expertId) {
+    const state = get()
+    const updated = {
+      cases: state.cases.map(c =>
+        c.caseId === caseId ? { ...c, selectedExpertId: expertId } : c
+      ),
+    }
     set(updated)
     persist({ ...state, ...updated })
   },

@@ -400,7 +400,7 @@ export default function ComplaintAnalysis({ caseObject }) {
                     ⚠ MANAGING PARTNER REVIEW TRIGGERED
                   </motion.div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                    Rafael Llopiz has flagged this case for immediate review. Critical issues were missed on intake.
+                    Onier Llopiz has flagged this case for immediate review. Critical issues were missed on intake.
                   </div>
                   <button
                     onClick={requestMPMemo}
@@ -430,7 +430,7 @@ export default function ComplaintAnalysis({ caseObject }) {
                 {currentDate}
               </div>
               <div style={{ fontSize: '14px', color: 'var(--accent-gold)', fontFamily: 'var(--font-serif)', marginTop: '4px' }}>
-                Rafael Llopiz, Managing Partner
+                Onier Llopiz, Managing Partner
               </div>
               <div style={{ width: '40px', height: '2px', background: 'var(--accent-gold)', marginTop: '12px' }} />
             </div>

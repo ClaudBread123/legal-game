@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore.js'
 import LITIGATION_PHASES, { LITIGATION_ACTIONS } from '../../data/litigationActions.js'
+import ExpertPanel from './ExpertPanel.jsx'
 import Modal from '../shared/Modal.jsx'
+
+const EXPERT_WIZARD_ACTION_IDS = new Set(['identify_expert', 'select_expert', 'retain_expert'])
 
 function isPhaseUnlocked(phase, completedActions) {
   if (phase.id === 'phase_1') return true
@@ -201,9 +204,18 @@ export default function LitigationActions({ caseObject }) {
           </div>
         </div>
       ) : (
-        /* Actions grid */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
-          {selectedPhase.actions.map(action => {
+        <>
+          {/* Expert panel for Phase 4 */}
+          {selectedPhaseId === 'phase_4' && isSelectedUnlocked && (
+            <ExpertPanel caseObject={caseObject} />
+          )}
+
+          {/* Actions grid — in Phase 4, exclude the wizard-handled actions */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+          {(selectedPhaseId === 'phase_4'
+            ? selectedPhase.actions.filter(a => !EXPERT_WIZARD_ACTION_IDS.has(a.id))
+            : selectedPhase.actions
+          ).map(action => {
             const done = completed.includes(action.id)
             const actionAvailable = isSelectedUnlocked && isActionAvailable(action, completed)
             const canAct = actionAvailable && !done && dailyActionsRemaining >= action.dailyActionCost
@@ -329,7 +341,8 @@ export default function LitigationActions({ caseObject }) {
               </div>
             )
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Confirm modal */}
