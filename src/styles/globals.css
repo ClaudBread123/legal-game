@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #161b27;
+  --bg-card: #1e2535;
+  --border: #2a3347;
+  --accent-gold: #c9a84c;
+  --accent-blue: #4a9eff;
+  --accent-red: #e05252;
+  --accent-green: #4caf82;
+  --accent-yellow: #f0b429;
+  --text-primary: #e8ecf4;
+  --text-secondary: #8b95a8;
+  --text-muted: #4a5568;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.money {
+  font-family: var(--font-mono);
+  color: var(--accent-gold);
+}
+
+.case-id {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.card-critical {
+  border-left: 3px solid var(--accent-red);
+}
+
+.card-major {
+  border-left: 3px solid var(--accent-yellow);
+}
+
+.card-active {
+  border-left: 3px solid var(--accent-green);
+}
+
+.card-default {
+  border-left: 3px solid var(--accent-blue);
+}
+
+input, textarea {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--accent-gold);
+}
+
+button {
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: var(--font-sans);
+  border-radius: 6px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
