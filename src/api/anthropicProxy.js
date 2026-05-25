@@ -1,20 +1,19 @@
-const PROXY_URL = import.meta.env.VITE_API_PROXY_URL
+const FALLBACK_URL = 'https://llw-api-proxy.ollopiz.workers.dev'
+const _envUrl = import.meta.env.VITE_API_PROXY_URL
+const PROXY_URL = (_envUrl && _envUrl !== 'PLACEHOLDER' && !_envUrl.includes('your-worker'))
+  ? _envUrl
+  : FALLBACK_URL
 
 export async function testApiConnection() {
-  console.log('API Test — Proxy URL:', PROXY_URL)
+  const _e = import.meta.env.VITE_API_PROXY_URL
+  const proxyUrl = (_e && _e !== 'PLACEHOLDER' && !_e.includes('your-worker'))
+    ? _e
+    : FALLBACK_URL
 
-  if (!PROXY_URL ||
-      PROXY_URL === 'PLACEHOLDER' ||
-      PROXY_URL === 'https://placeholder.example.com') {
-    return {
-      success: false,
-      reason: 'NO_PROXY_URL',
-      message: 'VITE_API_PROXY_URL not configured'
-    }
-  }
+  console.log('API Test — Proxy URL:', proxyUrl)
 
   try {
-    const response = await fetch(PROXY_URL, { method: 'GET' })
+    const response = await fetch(proxyUrl, { method: 'GET' })
 
     if (response.ok) {
       const data = await response.json()
@@ -44,15 +43,11 @@ export async function testApiConnection() {
 }
 
 export function isApiAvailable() {
-  return !!(
-    PROXY_URL &&
-    PROXY_URL !== 'PLACEHOLDER' &&
-    PROXY_URL !== 'https://placeholder.example.com'
-  )
+  return !!PROXY_URL
 }
 
 export async function callClaude({ system, userMessage, maxTokens = 1000 }) {
-  console.log('callClaude: proxy URL =', PROXY_URL ? PROXY_URL.substring(0, 30) + '...' : 'NOT SET')
+  console.log('callClaude: using proxy URL:', PROXY_URL)
 
   if (!isApiAvailable()) {
     console.warn('callClaude: API unavailable — no proxy URL configured')
