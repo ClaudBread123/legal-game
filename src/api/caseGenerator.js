@@ -60,10 +60,66 @@ function extractIncidentType(factScenario) {
   return null
 }
 
+function buildVarietyPrompt(existingCases) {
+  if (!existingCases || existingCases.length === 0) {
+    return `Generate a completely unique case. Do not use Palmetto Shores, Marcus Delray, Riverside Park, Officer Dana Whitmore, Suncoast Charter Academy, Priya Nambiar, or any park negligent security scenario.`
+  }
+
+  const history = existingCases.map(c => ({
+    caseId: c.caseId,
+    defendant: c.defendant,
+    defendantType: extractMunicipalityType(c.defendant),
+    plaintiff: c.clientName,
+    caseType: c.caseType,
+    incidentType: extractIncidentType(c.factScenario),
+    primaryIssue: c.hiddenIssues?.[0]?.issueType,
+  }))
+
+  const prohibitedDefendants = existingCases.map(c => c.defendant)
+  const prohibitedDefendantTypes = [...new Set(existingCases.map(c => extractMunicipalityType(c.defendant)))]
+  const prohibitedIncidentTypes = [...new Set(existingCases.map(c => extractIncidentType(c.factScenario)).filter(Boolean))]
+  const prohibitedPlaintiffs = existingCases.map(c => c.clientName)
+  const prohibitedIssues = existingCases.map(c => c.hiddenIssues?.[0]?.issueType).filter(Boolean)
+
+  return `
+EXISTING CASES — STRICT VARIETY REQUIRED:
+${JSON.stringify(history, null, 2)}
+
+YOU ARE STRICTLY PROHIBITED FROM USING:
+
+Prohibited defendants (exact names):
+${prohibitedDefendants.map(d => `- ${d}`).join('\n')}
+
+Prohibited defendant types (use a different type):
+${prohibitedDefendantTypes.map(t => `- ${t}`).join('\n')}
+(If all existing cases use cities, use a county, school board, or special district instead)
+
+Prohibited incident types (use a different incident):
+${prohibitedIncidentTypes.length > 0 ? prohibitedIncidentTypes.map(t => `- ${t}`).join('\n') : '(none yet)'}
+(If existing cases involve negligent security, use vehicle accident, employment, wrongful arrest, premises defect, or property taking instead)
+
+Prohibited plaintiff names:
+${prohibitedPlaintiffs.map(p => `- ${p}`).join('\n')}
+
+Prohibited primary hidden issue types (use a different primary issue):
+${prohibitedIssues.length > 0 ? prohibitedIssues.map(i => `- ${i}`).join('\n') : '(none yet)'}
+
+Also NEVER use:
+- Palmetto Shores (any variation)
+- Riverside Park
+- Marcus Delray
+- Officer Dana Whitmore
+- Any park negligent security at night scenario
+- Suncoast Charter Academy
+- Priya Nambiar
+
+The new case MUST be meaningfully different from all existing cases on every dimension.`
+}
+
 function buildCaseHistory(existingCases) {
   if (!existingCases || existingCases.length === 0) return ''
   const summaries = existingCases.slice(-5).map(c =>
-    `- ${c.caseId}: ${c.defendant} (${c.caseType}), incident: ${extractIncidentType(c.factScenario) || 'unspecified'}`
+    `- ${c.caseId}: ${c.defendant} (${c.caseType}), incident: ${extractIncidentType(c.factScenario) || 'unspecified'}, plaintiff: ${c.clientName}`
   )
   return `\n\nEXISTING CASES (avoid repeating defendant names, municipality types, or incident types):\n${summaries.join('\n')}`
 }
@@ -95,7 +151,7 @@ When embedding hidden issues:
 - SOL: 2 years for negligence, 4 years for other civil actions
 - §1983 claims are UNCAPPED — do not apply §768.28(5) caps to federal civil rights claims`
 
-  const caseHistoryText = buildCaseHistory(existingCases)
+  const varietyPrompt = buildVarietyPrompt(existingCases)
 
   const constraintsText = constraints ? `
 
@@ -104,7 +160,10 @@ ${constraints.mustInclude?.length ? `- Must include hidden issues of these types
 ${constraints.difficulty ? `- Difficulty level: ${constraints.difficulty}/4` : ''}
 ${constraints.instruction ? `- Specific instruction: ${constraints.instruction}` : ''}` : ''
 
-  const userMessage = `Generate a case of type: ${caseType} for a player at level ${playerLevel}. Today's simulated date is ${currentDate}.${caseHistoryText}${constraintsText}
+  const userMessage = `Generate a case of type: ${caseType} for a player at level ${playerLevel}. Today's simulated date is ${currentDate}.
+
+${varietyPrompt}
+${constraintsText}
 
 Required JSON schema:
 {

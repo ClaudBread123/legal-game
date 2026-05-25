@@ -11,9 +11,10 @@ function CaseLoadingScreen() {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 500)
-    const t2 = setTimeout(() => setPhase(2), 2000)
-    const t3 = setTimeout(() => setPhase(3), 15000)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    const t2 = setTimeout(() => setPhase(2), 3000)
+    const t3 = setTimeout(() => setPhase(3), 8000)
+    const t4 = setTimeout(() => setPhase(4), 15000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
   }, [])
 
   useEffect(() => {
@@ -51,13 +52,13 @@ function CaseLoadingScreen() {
                 fontFamily: 'var(--font-serif)', fontStyle: 'italic',
               }}
             >
-              Reviewing your assigned matters{dots}
+              Reviewing your assignment{dots}
             </motion.div>
           )}
 
           {phase >= 2 && (
             <motion.div
-              key="matter-type"
+              key="preparing"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
@@ -71,11 +72,27 @@ function CaseLoadingScreen() {
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              Incoming matter: Florida Municipal Defense — Tort Claim
+              Preparing case file{dots}
             </motion.div>
           )}
 
           {phase >= 3 && (
+            <motion.div
+              key="almost"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              style={{
+                marginTop: '12px',
+                fontSize: '13px', color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+              }}
+            >
+              Almost ready{dots}
+            </motion.div>
+          )}
+
+          {phase >= 4 && (
             <motion.div
               key="slow"
               initial={{ opacity: 0 }}
@@ -87,7 +104,7 @@ function CaseLoadingScreen() {
                 fontFamily: 'var(--font-mono)',
               }}
             >
-              Taking a moment longer than usual...
+              This is taking a moment — complex matter incoming...
             </motion.div>
           )}
         </AnimatePresence>

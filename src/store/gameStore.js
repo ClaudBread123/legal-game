@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { FALLBACK_CASES } from '../data/fallbackCases.js'
+import { FALLBACK_CASES, getNextFallbackCase } from '../data/fallbackCases.js'
 import { generateCase } from '../api/caseGenerator.js'
 import { shouldTriggerResolution, determineResolutionPath } from '../utils/caseResolution.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
@@ -12,8 +12,8 @@ import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequences
 import { isApiAvailable } from '../api/anthropicProxy.js'
 import { generatePublicRecordsResponse } from '../data/publicRecordsData.js'
 
-const SAVE_KEY = 'llw_save_v2'
-const OLD_SAVE_KEY = 'llw_save_v1'
+const SAVE_KEY = 'llw_save_v3'
+const OLD_SAVE_KEY = 'llw_save_v2'
 
 function getDailyActionsForTitle(title) {
   switch (title) {
@@ -212,7 +212,7 @@ const defaultState = {
   staleGameCleared: false,
   toasts: [],
   pendingCaseGeneration: null,
-  isGeneratingFirstCase: false,
+  isGeneratingCase: false,
 }
 
 const saved = loadSaved()
@@ -228,13 +228,14 @@ export const useGameStore = create((set, get) => ({
     const startDate = getSimulatedStartDate()
     const welcomeEmails = buildWelcomeEmails(playerName, startDate)
 
-    // Set up player state immediately so loading screen has something to show
+    // Step 1: Set up player state — gameStarted: false until case is ready
     const baseState = {
       ...defaultState,
       player: { ...defaultPlayer, name: playerName || 'Associate' },
       cases: [],
       pendingCases: [],
-      gameStarted: true,
+      gameStarted: false,  // NOT true yet — set after case 1 is ready
+      isGeneratingCase: true,
       currentDate: startDate,
       dailyActionsRemaining: 4,
       dailyActionsTotal: 4,
@@ -247,12 +248,15 @@ export const useGameStore = create((set, get) => ({
       emails: welcomeEmails,
       generatedEmailEvents: [],
       staleGameCleared: false,
-      isGeneratingFirstCase: true,
+      saveVersion: 'v3',
     }
     set(baseState)
     persist(baseState)
 
+    // Step 2: Generate Case 1 — AWAIT fully before doing anything else
+    let case1
     try {
+      console.log('initGame: generating Case 1 via API')
       const rawCase1 = await generateCase({
         caseType: 'state_tort',
         playerLevel: 1,
@@ -260,11 +264,28 @@ export const useGameStore = create((set, get) => ({
         constraints: {
           mustInclude: ['barred_individual_defendant', 'insufficient_presuit_notice'],
           difficulty: 1,
-          instruction: 'This is a first case for a new associate. The fact scenario should involve a Florida municipality and a tort claim with a clearly named individual employee defendant. The issues should be identifiable with careful reading but not obvious to someone who has not studied §768.28. Make the defendant a Florida municipality — city, county, or special district.',
+          instruction: `Generate a unique Florida governmental defense tort case for a junior associate's first assignment.
+
+MANDATORY REQUIREMENTS:
+- Defendant must be a Florida city, county, or special district
+- Must include an individual employee named as a defendant whose claim is barred by §768.28(9) Florida Statutes
+- Must include a pre-suit notice issue under §768.28(6)
+- Fact scenario must be 3-5 sentences
+- Must feel realistic to Florida practice
+
+PROHIBITED — DO NOT USE ANY OF THESE:
+- Palmetto Shores or any variation
+- Marcus Delray or any variation
+- Riverside Park
+- Officer Dana Whitmore
+- Negligent security at a park
+- Suncoast Charter Academy
+- Priya Nambiar
+
+Use a completely different Florida city or county, a different type of incident, and a different plaintiff name.`,
         },
       })
-
-      const case1 = makeCaseObject({
+      case1 = makeCaseObject({
         ...rawCase1,
         completedActions: [],
         hoursBilled: 0,
@@ -272,64 +293,66 @@ export const useGameStore = create((set, get) => ({
         estimatedHours: 40 + Math.floor(Math.random() * 20),
         status: 'active',
       })
-
-      const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)
-
-      const updatedWithCase = {
-        cases: [case1],
-        emails: [case1Email, ...welcomeEmails],
-        generatedEmailEvents: [`case_assigned_${case1.caseId}`],
-        isGeneratingFirstCase: false,
-      }
-      set(updatedWithCase)
-      persist({ ...baseState, ...updatedWithCase })
-
-      // Generate second case in background (no await — don't block the loading screen)
-      const case2Type = Math.random() > 0.5 ? 'section_1983' : 'employment'
-      generateCase({
-        caseType: case2Type,
-        playerLevel: 1,
-        currentDate: startDate,
-        constraints: {
-          mustInclude: case2Type === 'section_1983' ? ['federal_removal_1983'] : ['admin_exhaustion'],
-          difficulty: 1,
-          instruction: 'This is the second case for a new associate arriving on day 8. It should introduce federal jurisdiction concepts — either a §1983 claim or an employment case with FCHR exhaustion issues. The defendant should be a charter school or school board.',
-        },
-      }).then(rawCase2 => {
-        const case2 = makeCaseObject({
-          ...rawCase2,
-          completedActions: [],
-          hoursBilled: 0,
-          amountBilled: 0,
-          estimatedHours: 40 + Math.floor(Math.random() * 20),
-          status: 'active',
-        })
-        const state = get()
-        const update = { pendingCases: [...(state.pendingCases || []), case2] }
-        set(update)
-        persist({ ...state, ...update })
-      }).catch(() => {
-        const case2 = makeCaseObject(FALLBACK_CASES[1])
-        const state = get()
-        const update = { pendingCases: [...(state.pendingCases || []), case2] }
-        set(update)
-        persist({ ...state, ...update })
-      })
-
-    } catch {
-      // API unavailable — use fallback cases silently
-      const case1 = makeCaseObject(FALLBACK_CASES[0])
-      const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)
-      const fallback = {
-        cases: [case1],
-        pendingCases: [makeCaseObject(FALLBACK_CASES[1])],
-        emails: [case1Email, ...welcomeEmails],
-        generatedEmailEvents: [`case_assigned_${case1.caseId}`],
-        isGeneratingFirstCase: false,
-      }
-      set(fallback)
-      persist({ ...baseState, ...fallback })
+      console.log('initGame: Case 1 generated successfully', case1.caseId)
+    } catch (err) {
+      console.error('initGame: Case 1 generation failed', err?.message)
+      case1 = makeCaseObject(getNextFallbackCase([]))
+      console.log('initGame: using fallback', case1.caseId)
     }
+
+    const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)
+
+    // Step 3: Now set gameStarted: true WITH the case
+    const stateWithCase = {
+      cases: [case1],
+      emails: [case1Email, ...welcomeEmails],
+      generatedEmailEvents: [`case_assigned_${case1.caseId}`],
+      gameStarted: true,
+      isGeneratingCase: false,
+    }
+    set(stateWithCase)
+    persist({ ...baseState, ...stateWithCase })
+
+    // Step 4: Log activity
+    get().logActivity(
+      `Welcome to Llopiz Wizel LLP, ${playerName}. Your caseload has been assigned.`,
+      'info'
+    )
+
+    // Step 5: Generate Case 2 in background (no await — can take time)
+    const case2Type = Math.random() > 0.5 ? 'section_1983' : 'employment'
+    generateCase({
+      caseType: case2Type,
+      playerLevel: 1,
+      currentDate: startDate,
+      existingCases: [case1],
+      constraints: {
+        mustInclude: case2Type === 'section_1983' ? ['federal_removal_1983'] : ['admin_exhaustion'],
+        difficulty: 1,
+        instruction: `Generate the second case for a new associate. This case should introduce federal jurisdiction concepts. It must include a §1983 federal civil rights claim that creates a removal trigger with a 30-day deadline. The defendant should be a charter school or school board. Use a completely different incident type, defendant name, and plaintiff from case ${case1.caseId} (${case1.defendant}).`,
+      },
+    }).then(rawCase2 => {
+      console.log('initGame: Case 2 generated', rawCase2.caseId)
+      const case2 = makeCaseObject({
+        ...rawCase2,
+        completedActions: [],
+        hoursBilled: 0,
+        amountBilled: 0,
+        estimatedHours: 40 + Math.floor(Math.random() * 20),
+        status: 'active',
+      })
+      const state = get()
+      const update = { pendingCases: [...(state.pendingCases || []), case2] }
+      set(update)
+      persist({ ...state, ...update })
+    }).catch(err => {
+      console.error('initGame: Case 2 generation failed', err?.message)
+      const fallback2 = makeCaseObject(getNextFallbackCase([case1.caseId]))
+      const state = get()
+      const update = { pendingCases: [...(state.pendingCases || []), fallback2] }
+      set(update)
+      persist({ ...state, ...update })
+    })
   },
 
   advanceDay() {
