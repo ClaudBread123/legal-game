@@ -1,121 +1,59 @@
 import { callClaude } from './anthropicProxy.js'
 import { FALLBACK_CHECKS } from '../data/fallbackChecks.js'
-import { getLegalContextForAction } from '../data/legalKnowledgeBase.js'
-import { withConfidenceRetry } from './withConfidenceRetry.js'
 
 const DIFFICULTY_BY_LEVEL = {
-  'Junior Associate': 1,
-  'Associate': 2,
-  'Senior Associate': 3,
-  'Junior Partner': 3,
-  'Partner': 4,
-  'Equity Shareholder': 4,
+  'Junior Associate': 1, 'Associate': 2, 'Senior Associate': 3,
+  'Junior Partner': 3, 'Partner': 4, 'Equity Shareholder': 4,
 }
 
 export async function generateActionCheck({
-  caseObject,
-  actionId,
-  playerLevel,
-  completedActions,
-  activeConsequences,
+  caseObject, actionId, playerLevel, completedActions, activeConsequences,
 }) {
   const difficulty = DIFFICULTY_BY_LEVEL[playerLevel] || 1
-  const legalContext = getLegalContextForAction(actionId, caseObject)
 
-  const systemPrompt = `You are an expert Florida governmental defense attorney and legal educator at Llopiz Wizel LLP. You generate case-specific comprehension check questions for litigation training simulations.
+  const systemPrompt = `You generate multiple choice questions testing Florida governmental defense law.
+Questions must reference the specific case facts.
+Output ONLY valid JSON. No markdown.
+Key law: §768.28(9) individual immunity, §768.28(6) pre-suit notice, HB145 caps (Oct 1 2026: $350k/$500k; before: $200k/$300k), §1983 removal within 30 days.`
 
-AUTHORITATIVE LEGAL REFERENCE — USE ONLY THIS LAW:
+  const userPrompt = `Action: ${actionId}
+Case: ${caseObject.defendant} | Type: ${caseObject.caseType}
+Incident: ${caseObject.dateOfIncident} | HB145: ${caseObject.hb145Applicable}
+Facts: ${caseObject.factScenario.substring(0, 200)}
+Claims: ${caseObject.claimsAsserted.slice(0, 2).join('; ')}
+Issues: ${(caseObject.hiddenIssues || []).map(i => i.issueType).slice(0, 3).join(', ')}
+Player level: ${playerLevel} (difficulty ${difficulty}/4)
 
-${legalContext}
+Generate 2 multiple choice questions about this action on this specific case.
+Reference the defendant, facts, and applicable Florida statutes.
 
-CRITICAL INSTRUCTIONS:
-1. Apply ONLY the statutory provisions above as your authoritative source of law
-2. Do not apply any version of these statutes other than what is provided above
-3. The HB 145 changes are reflected in the text above — apply the correct version based on the incident date provided
-4. If you are uncertain about a legal point not covered by the above provisions, flag it as requiring professional verification rather than speculating
-5. Every legal proposition in your response must be traceable to the above statutory text
-
-Your questions must:
-1. Be hyper-specific to the exact case facts, claims, parties, and statutes provided
-2. Test genuine legal understanding, not just memory
-3. Scale in difficulty based on the player's career level (1=easiest, 4=hardest)
-4. Reference specific Florida statutes, rules, and case law where applicable
-5. Have exactly one correct answer
-6. Include a thorough explanation of why the correct answer is right and others are wrong — cite specific statutes
-7. Be answerable by a competent attorney — not trick questions
-
-At difficulty 1: 4 options, one clearly correct, educational and guiding tone
-At difficulty 2: 4 options, all plausible, requires genuine analysis
-At difficulty 3: 4 options, subtle distinctions, requires synthesis of facts and law
-At difficulty 4: may include open analysis questions with detailed rubric
-
-Output ONLY valid JSON matching the schema exactly. No markdown, no explanation outside the JSON.`
-
-  const userPrompt = `Generate comprehension check questions for this action on this specific case.
-
-ACTION BEING TAKEN: ${actionId}
-
-CASE FACTS:
-- Case ID: ${caseObject.caseId}
-- Case Type: ${caseObject.caseType}
-- Defendant: ${caseObject.defendant}
-- Plaintiff: ${caseObject.clientName}
-- Date of Incident: ${caseObject.dateOfIncident}
-- HB 145 Applicable: ${caseObject.hb145Applicable}
-- Fact Scenario: ${caseObject.factScenario}
-- Claims Asserted: ${JSON.stringify(caseObject.claimsAsserted)}
-- Hidden Issues: ${JSON.stringify(caseObject.hiddenIssues)}
-- Applicable Defenses: ${JSON.stringify(caseObject.applicableDefenses)}
-
-CASE STATUS:
-- Completed Actions: ${JSON.stringify(completedActions)}
-- Active Consequences: ${JSON.stringify(activeConsequences)}
-
-PLAYER LEVEL: ${playerLevel} (difficulty ${difficulty}/4)
-
-Generate 2-3 questions for difficulty ${difficulty}.
-For difficulty 1-2: multiple choice only.
-For difficulty 3: multiple choice with one short-answer follow-up.
-For difficulty 4: one multiple choice + one detailed analysis question with rubric.
-
-Required JSON schema:
+Return JSON:
 {
-  "actionContext": "2-3 sentence explanation of what this action means strategically on this specific case",
-  "keyStatutes": ["list of statutes directly relevant to this action on this case"],
+  "actionContext": "Why this action matters on this specific case — 2 sentences",
+  "keyStatutes": ["§768.28(9)", "§768.28(6)"],
   "questions": [
     {
       "id": "q1",
       "type": "multiple_choice",
-      "question": "question text — must reference specific case facts",
-      "options": {
-        "A": "option text",
-        "B": "option text",
-        "C": "option text",
-        "D": "option text"
-      },
+      "question": "Question referencing ${caseObject.defendant} specifically",
+      "options": {"A": "option", "B": "option", "C": "option", "D": "option"},
       "correctAnswer": "B",
-      "explanation": "detailed explanation of why B is correct and why A, C, D are wrong — cite specific statutes",
-      "statute": "primary statute cited",
+      "explanation": "Why B is correct, citing specific statute",
+      "statute": "§768.28(X)",
       "xpValue": 25
     }
   ],
   "qualityRubric": {
-    "excellent": "what excellent performance looks like on this action",
-    "adequate": "what adequate performance looks like",
-    "deficient": "what deficient performance looks like and its consequences"
-  },
-  "confidenceScore": "HIGH|MEDIUM|LOW"
+    "excellent": "what excellent looks like",
+    "adequate": "what adequate looks like",
+    "deficient": "what deficient looks like"
+  }
 }`
 
   try {
-    return await withConfidenceRetry(
-      async (a) => {
-        const response = await callClaude(a)
-        const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
-        return JSON.parse(clean)
-      },
-      { system: systemPrompt, userMessage: userPrompt, maxTokens: 2000 }
-    )
+    const response = await callClaude({ system: systemPrompt, userMessage: userPrompt, maxTokens: 1200 })
+    const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+    return JSON.parse(clean)
   } catch (err) {
     console.warn('generateActionCheck fallback:', err.message)
     return getFallbackCheck(actionId, caseObject, difficulty)
@@ -125,9 +63,7 @@ Required JSON schema:
 function getFallbackCheck(actionId, caseObject, difficulty) {
   const fallbacks = FALLBACK_CHECKS[actionId]
   if (!fallbacks) return null
-
   const tier = fallbacks[Math.min(difficulty - 1, fallbacks.length - 1)]
-
   return {
     ...tier,
     questions: tier.questions.map(q => ({
@@ -137,8 +73,7 @@ function getFallbackCheck(actionId, caseObject, difficulty) {
         .replace(/\[PLAINTIFF\]/g, caseObject.clientName)
         .replace(/\[INCIDENT_DATE\]/g, caseObject.dateOfIncident)
         .replace(/\[HB145\]/g, caseObject.hb145Applicable
-          ? 'HB 145 applies (post Oct 1, 2026)'
-          : 'Pre-HB 145 rules apply'),
+          ? 'HB 145 applies (post Oct 1, 2026)' : 'Pre-HB 145 rules apply'),
     })),
   }
 }
