@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { callClaude } from '../api/anthropicProxy.js'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import CaseCard from '../components/dashboard/CaseCard.jsx'
@@ -60,6 +61,69 @@ export default function Dashboard() {
 
   return (
     <>
+    <button
+      onClick={async () => {
+        console.log('=== FULL API TEST START ===')
+
+        console.log('Test 1: Health check GET request')
+        try {
+          const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', { method: 'GET' })
+          const data = await res.json()
+          console.log('Health check result:', data)
+        } catch (err) {
+          console.error('Health check failed:', err)
+        }
+
+        console.log('Test 2: Real Claude API call')
+        try {
+          const result = await callClaude({
+            system: 'You are a helpful assistant.',
+            userMessage: 'Say exactly: API_WORKING',
+            maxTokens: 50,
+          })
+          console.log('Claude response:', result)
+        } catch (err) {
+          console.error('Claude call failed:', err.message)
+          console.error('Full error:', err)
+        }
+
+        console.log('Test 3: Direct POST to worker')
+        try {
+          const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system: 'You are helpful.',
+              userMessage: 'Say: DIRECT_TEST_WORKING',
+              maxTokens: 50,
+            }),
+          })
+          console.log('Status:', res.status)
+          const text = await res.text()
+          console.log('Raw response:', text)
+        } catch (err) {
+          console.error('Direct POST failed:', err)
+        }
+
+        console.log('=== FULL API TEST END ===')
+      }}
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        zIndex: 9999,
+        background: 'var(--accent-gold)',
+        color: '#000',
+        border: 'none',
+        padding: '12px 20px',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontFamily: 'var(--font-sans)',
+        fontWeight: '600',
+      }}
+    >
+      Test API
+    </button>
     <motion.div
       variants={pageVariants}
       initial="initial"
