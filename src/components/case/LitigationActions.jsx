@@ -7,10 +7,12 @@ import InvestigationResults from './InvestigationResults.jsx'
 import PublicRecordsRequest from './PublicRecordsRequest.jsx'
 import StatusUpdateModal from './StatusUpdateModal.jsx'
 import ActionComprehensionModal from './ActionComprehensionModal.jsx'
+import FreeTextActionModal from './FreeTextActionModal.jsx'
 import Modal from '../shared/Modal.jsx'
 import { generateActionCheck } from '../../api/generateActionCheck.js'
 
 const EXPERT_WIZARD_ACTION_IDS = new Set(['identify_expert', 'select_expert', 'retain_expert'])
+const FREE_TEXT_ACTIONS = new Set(['motion_to_dismiss', 'initial_evaluation'])
 
 const SPECIAL_MODAL_TYPES = {
   background_check: 'investigation_background',
@@ -68,6 +70,11 @@ export default function LitigationActions({ caseObject }) {
     checkData: null,
     isLoading: false,
   })
+  const [freeTextModal, setFreeTextModal] = useState({
+    isOpen: false,
+    action: null,
+    checkData: null,
+  })
 
   const completed = caseObject.completedActions || []
   const timestamps = caseObject.actionTimestamps || {}
@@ -93,7 +100,25 @@ export default function LitigationActions({ caseObject }) {
   }
 
   const openComprehensionCheck = async (action) => {
-    // Open modal in loading state immediately
+    if (FREE_TEXT_ACTIONS.has(action.id)) {
+      // Open free-text modal — fetch context data but don't block on it
+      setFreeTextModal({ isOpen: true, action, checkData: null })
+      try {
+        const checkData = await generateActionCheck({
+          caseObject,
+          actionId: action.id,
+          playerLevel: player?.title || 'Junior Associate',
+          completedActions: completed,
+          activeConsequences: caseObject.activeConsequences || [],
+        })
+        setFreeTextModal(prev => ({ ...prev, checkData }))
+      } catch {
+        // Modal works fine without checkData — INSTRUCTIONS map provides context
+      }
+      return
+    }
+
+    // Open MC comprehension modal in loading state immediately
     setCheckModal({ isOpen: true, action, checkData: null, isLoading: true })
 
     try {
@@ -106,9 +131,7 @@ export default function LitigationActions({ caseObject }) {
       })
       setCheckModal(prev => ({ ...prev, checkData, isLoading: false }))
     } catch {
-      // generateActionCheck already returns fallback on error; if it returns null, skip check
       setCheckModal({ isOpen: false, action: null, checkData: null, isLoading: false })
-      // Fall through to standard confirm modal
       setModalAction(action)
     }
   }
@@ -142,6 +165,41 @@ I've been informed that your assessment on "${action.label}" (${caseObject.caseI
 This is not a matter of effort — it is a matter of preparation and understanding. Deficient work on a governmental defense matter has real consequences for the client.
 
 Please review the relevant statutes and come prepared to discuss this file.
+
+— OL`,
+      })
+    }
+
+    setCelebrateId(action.id)
+    setTimeout(() => setCelebrateId(null), 1500)
+  }
+
+  const handleFreeTextComplete = (qualityScore, earnedXP) => {
+    const action = freeTextModal.action
+    setFreeTextModal({ isOpen: false, action: null, checkData: null })
+    if (!action) return
+
+    completeAction(caseObject.caseId, action.id, qualityScore)
+    billTime(caseObject.caseId, action.hours, action.label)
+    spendAction(action.dailyActionCost)
+    addXP(earnedXP, `${action.label} — ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
+    logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
+
+    if (qualityScore === 1) {
+      addEmail({
+        from: 'Onier Llopiz',
+        fromEmail: 'o.llopiz@llopizwizel.com',
+        subject: `Analysis Flagged — ${caseObject.caseId}`,
+        priority: 'urgent',
+        requiresResponse: false,
+        caseId: caseObject.caseId,
+        body: `${player?.name || 'Associate'},
+
+Your written analysis on "${action.label}" (${caseObject.caseId}) has been reviewed and scored deficient.
+
+Written analysis is not a formality — it is the foundation of strategy. If you cannot articulate the issues in writing, you cannot litigate the case.
+
+We will discuss this file. Come prepared.
 
 — OL`,
       })
@@ -488,6 +546,17 @@ Please review the relevant statutes and come prepared to discuss this file.
           />
         )}
       </Modal>
+
+      {/* Free-text analysis modal (motion_to_dismiss, initial_evaluation) */}
+      <FreeTextActionModal
+        isOpen={freeTextModal.isOpen}
+        onClose={() => setFreeTextModal({ isOpen: false, action: null, checkData: null })}
+        onComplete={handleFreeTextComplete}
+        action={freeTextModal.action}
+        caseObject={caseObject}
+        playerTitle={player?.title || 'Junior Associate'}
+        checkData={freeTextModal.checkData}
+      />
 
       {/* Comprehension check modal */}
       <ActionComprehensionModal

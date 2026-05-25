@@ -46,26 +46,35 @@ function XPCountUp({ total }) {
 }
 
 export default function ComplaintAnalysis({ caseObject }) {
-  const { player, currentDate, addXP, logActivity, addMPMessage, addNotification } = useGameStore()
+  const { player, currentDate, addXP, logActivity, addMPMessage, addNotification, updateCase } = useGameStore()
   const [selected, setSelected] = useState([])
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState(caseObject.issueAnalysisResults ?? null)
   const [tooltip, setTooltip] = useState(null)
   const [mpModal, setMpModal] = useState(null)
   const [mpLoading, setMpLoading] = useState(false)
 
+  const alreadySubmitted = caseObject.issueAnalysisSubmitted === true
+
   const toggle = id => {
+    if (alreadySubmitted) return
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
   const submit = async () => {
-    if (selected.length === 0 || loading) return
+    if (selected.length === 0 || loading || alreadySubmitted) return
     setLoading(true)
     try {
       const eval_ = await evaluateIssueAnalysis({
         caseObject, selectedIssueIds: selected, playerLevel: player.level,
       })
       setResult(eval_)
+      // Lock permanently
+      updateCase(caseObject.caseId, {
+        issueAnalysisSubmitted: true,
+        issueAnalysisResults: eval_,
+        issueAnalysisDate: currentDate,
+      })
       if (eval_.totalXP > 0) {
         addXP(eval_.totalXP, `Issue analysis — ${caseObject.caseId}`)
       }
@@ -148,8 +157,19 @@ export default function ComplaintAnalysis({ caseObject }) {
         </div>
       )}
 
+      {/* Already submitted — read-only banner */}
+      {alreadySubmitted && !result && (
+        <div style={{
+          padding: '12px 16px', marginBottom: '20px',
+          background: 'rgba(201,168,76,0.08)', border: '1px solid var(--accent-gold)',
+          borderRadius: '6px', fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic',
+        }}>
+          Issue analysis was submitted on {caseObject.issueAnalysisDate}. Loading results...
+        </div>
+      )}
+
       {/* Issue checklist */}
-      {!result && (
+      {!alreadySubmitted && !result && (
         <div>
           <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '12px', fontWeight: 600 }}>
             ISSUE IDENTIFICATION — Select all issues present in this complaint
@@ -368,6 +388,38 @@ export default function ComplaintAnalysis({ caseObject }) {
                 </div>
               )}
 
+              {/* Penalty breakdown */}
+              {result.penaltyBreakdown && (
+                <div style={{
+                  padding: '12px', background: 'rgba(239,68,68,0.06)',
+                  border: '1px solid var(--accent-red)44', borderRadius: '6px', marginBottom: '16px',
+                }}>
+                  <div style={{ fontSize: '10px', color: 'var(--accent-red)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: '8px' }}>
+                    XP CALCULATION
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: '1.8', color: 'var(--text-secondary)' }}>
+                    <div>Issues identified: <span style={{ color: 'var(--accent-green)' }}>+{result.penaltyBreakdown.gained} XP</span></div>
+                    {result.penaltyBreakdown.deducted > 0 && (
+                      <div>Incorrect flags: <span style={{ color: 'var(--accent-red)' }}>−{result.penaltyBreakdown.deducted - (result.penaltyBreakdown.sprayPenalty || 0)} XP</span></div>
+                    )}
+                    {result.penaltyBreakdown.sprayPenalty > 0 && (
+                      <div>Spray-and-pray penalty: <span style={{ color: 'var(--accent-red)' }}>−{result.penaltyBreakdown.sprayPenalty} XP</span></div>
+                    )}
+                    <div style={{ borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '4px' }}>
+                      Total earned: <span style={{ color: result.penaltyBreakdown.totalXP > 0 ? 'var(--accent-gold)' : 'var(--accent-red)' }}>
+                        {result.penaltyBreakdown.totalXP} XP
+                      </span>
+                      {result.penaltyBreakdown.rawXP < 0 && <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>(floored at 0)</span>}
+                    </div>
+                  </div>
+                  {result.penaltyBreakdown.oniersNote && (
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--accent-red)', fontStyle: 'italic' }}>
+                      {result.penaltyBreakdown.oniersNote}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Assessment */}
               <div style={{
                 padding: '12px', background: 'var(--bg-card)', borderRadius: '6px',
@@ -377,6 +429,13 @@ export default function ComplaintAnalysis({ caseObject }) {
                   {result.overallAssessment}
                 </div>
               </div>
+
+              {/* Submitted notice */}
+              {alreadySubmitted && (
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '12px', textAlign: 'center' }}>
+                  Issue analysis is a one-time assessment. Request a Case Review with Onier Llopiz to discuss further.
+                </div>
+              )}
 
               {/* XP count-up */}
               <XPCountUp total={result.totalXP} />

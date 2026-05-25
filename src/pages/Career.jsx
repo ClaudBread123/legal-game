@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
@@ -12,7 +13,7 @@ export default function Career() {
   const totalBilled = totalHours * BILLING_RATE
 
   return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: '32px', margin: '0 0 4px', color: 'var(--text-primary)' }}>
@@ -203,6 +204,6 @@ export default function Career() {
           {monthlyBillableHours >= 165 ? '✓ On target' : `${(165 - monthlyBillableHours).toFixed(1)}h below minimum target`}
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

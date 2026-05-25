@@ -108,6 +108,12 @@ function makeCaseObject(c) {
     activeConsequences: c.activeConsequences ?? [],
     consequencesTriggered: c.consequencesTriggered ?? [],
     consequenceTimestamps: c.consequenceTimestamps ?? {},
+    issueAnalysisSubmitted: c.issueAnalysisSubmitted ?? false,
+    issueAnalysisResults: c.issueAnalysisResults ?? null,
+    issueAnalysisDate: c.issueAnalysisDate ?? null,
+    actionQualityScores: c.actionQualityScores ?? {},
+    publicRecordsRequest: c.publicRecordsRequest ?? null,
+    investigationFindings: c.investigationFindings ?? {},
   }
 }
 
@@ -167,6 +173,14 @@ const defaultPlayer = {
   totalBillableHours: 0,
 }
 
+const CASE_GENERATION_SCHEDULE = [
+  { day: 20, caseType: 'state_tort' },
+  { day: 35, caseType: 'section_1983' },
+  { day: 50, caseType: 'employment' },
+  { day: 70, caseType: 'state_tort' },
+  { day: 90, caseType: 'section_1983' },
+]
+
 const defaultState = {
   player: { ...defaultPlayer },
   cases: [],
@@ -185,6 +199,8 @@ const defaultState = {
   emails: [],
   generatedEmailEvents: [],
   staleGameCleared: false,
+  toasts: [],
+  pendingCaseGeneration: null,
 }
 
 const saved = loadSaved()
@@ -399,6 +415,27 @@ Timely responses to opposing counsel and court notices are not optional. This ha
 
     const dailyActions = getDailyActionsForTitle(finalPlayer.title)
 
+    // Case generation schedule check
+    const scheduleEntry = CASE_GENERATION_SCHEDULE.find(s => s.day === newTotalGameDays)
+    let pendingCaseGeneration = state.pendingCaseGeneration || null
+    if (scheduleEntry && !pendingCaseGeneration) {
+      pendingCaseGeneration = { caseType: scheduleEntry.caseType, day: newTotalGameDays }
+    }
+
+    // Organic case generation: after day 30, if all cases have analysis submitted and < 3 active
+    if (!pendingCaseGeneration && newTotalGameDays >= 30) {
+      const activeCount = activeCases.filter(c => c.status === 'active').length
+      const allAnalyzed = activeCases.every(c => c.issueAnalysisSubmitted === true)
+      if (allAnalyzed && activeCount < 3) {
+        const pLevel = finalPlayer.level || 1
+        const organicType = pLevel >= 3 ? ['state_tort', 'section_1983', 'employment'][Math.floor(Math.random() * 3)] : ['state_tort', 'employment'][Math.floor(Math.random() * 2)]
+        pendingCaseGeneration = { caseType: organicType, day: newTotalGameDays, organic: true }
+      }
+    }
+
+    const dayToast = { id: `day-${nextDate}`, message: `${nextDate} — ${dailyActions} actions available`, type: 'info', duration: 2500, createdAt: Date.now() }
+    const newToasts = [...(state.toasts || []).filter(t => t.type !== 'info' || !t.id?.startsWith('day-')), dayToast]
+
     const updated = {
       currentDate: nextDate,
       cases: activeCases,
@@ -420,6 +457,8 @@ Timely responses to opposing counsel and court notices are not optional. This ha
         },
         ...state.activityFeed,
       ].slice(0, 50),
+      pendingCaseGeneration,
+      toasts: newToasts,
     }
     set(updated)
     persist({ ...state, ...updated })
@@ -785,6 +824,54 @@ Timely responses to opposing counsel and court notices are not optional. This ha
     const state = get()
     const available = isApiAvailable()
     const updated = { apiAvailable: available }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  addToast(message, type = 'info', duration = 4000) {
+    const state = get()
+    const toast = { id: `toast-${Date.now()}-${Math.random()}`, message, type, duration, createdAt: Date.now() }
+    const updated = { toasts: [...(state.toasts || []), toast] }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  dismissToast(toastId) {
+    const state = get()
+    const updated = { toasts: (state.toasts || []).filter(t => t.id !== toastId) }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  clearPendingCaseGeneration() {
+    const state = get()
+    const updated = { pendingCaseGeneration: null }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  addGeneratedCase(caseObject) {
+    const state = get()
+    const newCase = makeCaseObject({
+      ...caseObject,
+      completedActions: [],
+      hoursBilled: 0,
+      amountBilled: 0,
+      estimatedHours: 40 + Math.floor(Math.random() * 20),
+      status: 'active',
+      caseHealth: 100,
+      caseHealthEvents: [],
+      caseOutcomeProbability: { ...DEFAULT_PROBABILITY },
+      activeConsequences: [],
+      consequencesTriggered: [],
+      consequenceTimestamps: {},
+    })
+    const email = buildCaseAssignedEmail(newCase, state.player.name, state.currentDate)
+    const updated = {
+      cases: [...state.cases, newCase],
+      emails: [email, ...(state.emails || [])],
+      pendingCaseGeneration: null,
+    }
     set(updated)
     persist({ ...state, ...updated })
   },

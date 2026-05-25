@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import { formatGameDate } from '../utils/dateUtils.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
@@ -44,7 +45,7 @@ export default function Timekeeping() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '860px', margin: '0 auto' }}>
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }} style={{ padding: '32px', maxWidth: '860px', margin: '0 auto' }}>
       {delinquent && !isSubmitted && (
         <div style={{
           background: 'rgba(224,82,82,0.1)', border: '1px solid var(--accent-red)',
@@ -256,6 +257,6 @@ export default function Timekeeping() {
           </button>
         </>
       )}
-    </div>
+    </motion.div>
   )
 }

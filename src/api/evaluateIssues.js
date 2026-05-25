@@ -1,6 +1,12 @@
 import { callClaude } from './anthropicProxy.js'
+import { ISSUE_TYPES } from '../data/issueTypes.js'
 
 const XP_MAP = { critical: 100, major: 50, minor: 20 }
+
+// Penalty for INCORRECTLY flagging an issue (based on how significant that issue type is)
+const INCORRECT_FLAG_PENALTY = { critical: 60, major: 30, minor: 15 }
+const ISSUE_SEVERITY_MAP = Object.fromEntries(ISSUE_TYPES.map(i => [i.id, i.severity_hint || 'minor']))
+const TOTAL_ISSUE_COUNT = ISSUE_TYPES.length
 
 function has1983Claim(caseObject) {
   return (caseObject.claimsAsserted || []).some(c => c.includes('1983'))
@@ -68,26 +74,19 @@ function localEvaluate(caseObject, selectedIssueIds) {
   const correctlyIdentified = []
   const missed = []
   const incorrectlyFlagged = []
-  const legallyNuanced = []  // flagged but not penalized
+  const legallyNuanced = []
 
   const hiddenIds = (caseObject.hiddenIssues || []).map(i => i.issueType)
+  const isSprayAndPray = selectedIssueIds.length === TOTAL_ISSUE_COUNT
 
-  // Check player's selections
   for (const id of selectedIssueIds) {
     if (hiddenIds.includes(id)) {
-      // Correctly identified — find the issue
       const issue = caseObject.hiddenIssues.find(h => h.issueType === id)
       const xpAwarded = XP_MAP[issue.severity] || 10
-      correctlyIdentified.push({
-        issueId: id,
-        feedback: `Correct. ${issue.description}`,
-        xpAwarded,
-      })
+      correctlyIdentified.push({ issueId: id, feedback: `Correct. ${issue.description}`, xpAwarded })
     } else {
-      // Not in hidden issues — check if it's a valid nuanced flag or a real error
       const validation = validateIssueApplicability(id, caseObject)
       if (!validation.applicable && validation.note) {
-        // Nuanced — educate without penalty
         legallyNuanced.push({ issueId: id, reason: validation.note })
       } else {
         incorrectlyFlagged.push({ issueId: id, reason: 'This issue is not present on the face of the complaint.' })
@@ -95,11 +94,10 @@ function localEvaluate(caseObject, selectedIssueIds) {
     }
   }
 
-  // Check for missed issues (only count applicable ones)
   for (const issue of caseObject.hiddenIssues || []) {
     if (selectedIssueIds.includes(issue.issueType)) continue
     const validation = validateIssueApplicability(issue.issueType, caseObject)
-    if (!validation.applicable) continue  // don't count as missed if not applicable
+    if (!validation.applicable) continue
     missed.push({
       issueId: issue.issueType,
       description: issue.description,
@@ -110,9 +108,37 @@ function localEvaluate(caseObject, selectedIssueIds) {
   }
 
   const gained = correctlyIdentified.reduce((s, i) => s + i.xpAwarded, 0)
-  const deducted = incorrectlyFlagged.length * 10
-  const totalXP = Math.max(0, gained - deducted)
+  const perItemPenalty = incorrectlyFlagged.reduce((sum, item) => {
+    const sev = ISSUE_SEVERITY_MAP[item.issueId] || 'minor'
+    return sum + (INCORRECT_FLAG_PENALTY[sev] || 15)
+  }, 0)
+  const sprayPenalty = isSprayAndPray ? 50 : 0
+  const deducted = perItemPenalty + sprayPenalty
+  const rawXP = gained - deducted
+  const totalXP = Math.max(0, rawXP)
   const requiresMPReview = missed.some(m => m.severity === 'critical')
+
+  let overallAssessment = missed.length === 0
+    ? 'Excellent work. All threshold issues identified correctly.'
+    : `You missed ${missed.length} issue(s). Review the applicable statutes carefully before proceeding.`
+
+  if (isSprayAndPray) {
+    overallAssessment = 'Flagging every possible issue without analysis is not legal reasoning. Identify what actually applies to these facts.'
+  }
+
+  const penaltyBreakdown = rawXP < 0 || deducted > 0 ? {
+    gained,
+    deducted,
+    sprayPenalty,
+    rawXP,
+    totalXP,
+    isSprayAndPray,
+    oniersNote: isSprayAndPray
+      ? `Your issue analysis on ${caseObject.caseId} was unfocused. We need to discuss threshold issue identification.`
+      : rawXP < 0
+        ? `Your issue analysis on ${caseObject.caseId} produced more penalties than XP earned. Focus on what actually appears in the complaint.`
+        : null,
+  } : null
 
   return {
     correctlyIdentified,
@@ -120,11 +146,9 @@ function localEvaluate(caseObject, selectedIssueIds) {
     incorrectlyFlagged,
     legallyNuanced,
     totalXP,
-    overallAssessment:
-      missed.length === 0
-        ? 'Excellent work. All threshold issues identified correctly.'
-        : `You missed ${missed.length} issue(s). Review the applicable statutes carefully before proceeding.`,
+    overallAssessment,
     requiresMPReview,
+    penaltyBreakdown,
   }
 }
 
@@ -155,7 +179,12 @@ Return JSON:
   "requiresMPReview": boolean
 }
 
-XP awards: critical issue identified = 100, major = 50, minor = 20. XP deductions: incorrectly flagged = -10 each (not legallyNuanced).`
+XP awards: critical issue identified = 100, major = 50, minor = 20.
+XP deductions: incorrectly flagged = -60 if critical issue type, -30 if major, -15 if minor (check severity_hint in issue types).
+If player selected ALL 10 issue types: apply additional -50 XP spray-and-pray penalty.
+totalXP must be Math.max(0, gained - deducted).
+Include penaltyBreakdown: { gained, deducted, sprayPenalty, rawXP, totalXP, isSprayAndPray, oniersNote } when deducted > 0.
+legallyNuanced items get 0 XP deduction.`
 
   try {
     const text = await callClaude({ system, userMessage, maxTokens: 1400 })

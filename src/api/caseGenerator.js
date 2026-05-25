@@ -1,5 +1,45 @@
 import { callClaude } from './anthropicProxy.js'
-import { FALLBACK_CASES } from '../data/fallbackCases.js'
+import { FALLBACK_CASES, FALLBACK_CASE_QUEUE } from '../data/fallbackCases.js'
+import { addBusinessDays } from '../utils/dateUtils.js'
+
+const ALL_FALLBACKS = [...FALLBACK_CASES, ...FALLBACK_CASE_QUEUE]
+let fallbackIndex = 0
+
+const REQUIRED_FIELDS = [
+  'caseId', 'caseType', 'clientName', 'defendant',
+  'dateFiled', 'dateOfIncident', 'factScenario',
+  'claimsAsserted', 'hiddenIssues', 'applicableDefenses',
+  'previewFlag', 'hb145Applicable',
+]
+
+function validateCase(obj) {
+  for (const field of REQUIRED_FIELDS) {
+    if (obj[field] === undefined || obj[field] === null) {
+      throw new Error(`Missing required field: ${field}`)
+    }
+  }
+  if (!Array.isArray(obj.claimsAsserted) || obj.claimsAsserted.length === 0) {
+    throw new Error('claimsAsserted must be non-empty array')
+  }
+  if (!Array.isArray(obj.hiddenIssues) || obj.hiddenIssues.length === 0) {
+    throw new Error('hiddenIssues must be non-empty array')
+  }
+  return true
+}
+
+function getFallbackCase(currentDate) {
+  const base = ALL_FALLBACKS[fallbackIndex % ALL_FALLBACKS.length]
+  fallbackIndex++
+  // Override dateFiled to be relative to current game date
+  const dateFiled = currentDate
+    ? addBusinessDays(currentDate, -Math.floor(Math.random() * 5 + 3))
+    : base.dateFiled
+  return {
+    ...base,
+    caseId: `LW-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`,
+    dateFiled,
+  }
+}
 
 export async function generateCase({ caseType = 'state_tort', playerLevel = 1, currentDate }) {
   const system = `You are a case generation engine for a Florida governmental litigation training simulator at the law firm Llopiz Wizel LLP. Generate realistic but entirely fictitious civil cases against Florida municipalities or charter schools. All names, entities, and facts are fictional. Output ONLY valid JSON with no markdown formatting, no code blocks, no explanation. The JSON must match the schema exactly.`
@@ -29,17 +69,11 @@ Always make the fact scenario realistic to Florida governmental defense practice
 
   try {
     const text = await callClaude({ system, userMessage, maxTokens: 1500 })
-    const parsed = JSON.parse(text)
-    return {
-      ...parsed,
-      completedActions: [],
-      hoursBilled: 0,
-      amountBilled: 0,
-      estimatedHours: 40,
-      status: 'active',
-    }
+    const clean = text.replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(clean)
+    validateCase(parsed)
+    return parsed
   } catch {
-    const idx = Math.floor(Math.random() * FALLBACK_CASES.length)
-    return { ...FALLBACK_CASES[idx] }
+    return getFallbackCase(currentDate)
   }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import ComplaintAnalysis from '../components/case/ComplaintAnalysis.jsx'
 import LitigationActions from '../components/case/LitigationActions.jsx'
@@ -31,7 +32,13 @@ export default function CaseView() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '16px', padding: '20px', minHeight: 'calc(100vh - 64px)' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      style={{ display: 'flex', gap: '16px', padding: '20px', minHeight: 'calc(100vh - 64px)' }}
+    >
       {/* Left sidebar */}
       <div style={{ width: '260px', flexShrink: 0 }}>
         <div style={{ marginBottom: '8px' }}>
@@ -79,6 +86,6 @@ export default function CaseView() {
       <div style={{ width: '220px', flexShrink: 0 }}>
         <ManagingPartnerWidget caseObject={caseObject} issueEvaluation={issueEvaluation} />
       </div>
-    </div>
+    </motion.div>
   )
 }

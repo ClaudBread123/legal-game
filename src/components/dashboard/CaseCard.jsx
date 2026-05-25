@@ -20,7 +20,7 @@ const TYPE_COLORS = {
   employment: 'var(--accent-green)',
 }
 
-export default function CaseCard({ caseObject }) {
+export default function CaseCard({ caseObject, index = 0 }) {
   const navigate = useNavigate()
   const { currentDate } = useGameStore()
 
@@ -42,8 +42,10 @@ export default function CaseCard({ caseObject }) {
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.15 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.3, ease: 'easeOut' }}
+      whileHover={{ y: -3, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
       onClick={() => navigate(`/case/${caseObject.caseId}`)}
       style={{
         background: 'var(--bg-card)',
