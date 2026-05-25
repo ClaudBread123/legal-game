@@ -1,11 +1,15 @@
 import { callClaude } from './anthropicProxy.js'
-import { FALLBACK_CASES, FALLBACK_CASE_QUEUE } from '../data/fallbackCases.js'
+import { getNextFallbackCase } from '../data/fallbackCases.js'
 import { FL_768_28_FULL } from '../data/legalKnowledgeBase.js'
 import { validateCase as validateCaseLegal } from './validateCase.js'
 import { addBusinessDays } from '../utils/dateUtils.js'
 
-const ALL_FALLBACKS = [...FALLBACK_CASES, ...FALLBACK_CASE_QUEUE]
-let fallbackIndex = 0
+const PROHIBITED_DEFENDANTS = [
+  'broward county school board',
+  'suncoast charter academy',
+  'palmetto shores',
+  'horizon academy',
+]
 
 const REQUIRED_FIELDS = [
   'caseId', 'caseType', 'clientName', 'defendant',
@@ -62,7 +66,7 @@ function extractIncidentType(factScenario) {
 
 function buildVarietyPrompt(existingCases) {
   if (!existingCases || existingCases.length === 0) {
-    return `Generate a completely unique case. Do not use Palmetto Shores, Marcus Delray, Riverside Park, Officer Dana Whitmore, Suncoast Charter Academy, Priya Nambiar, or any park negligent security scenario.`
+    return `Generate a completely unique Florida state tort case involving a city or county municipality (NOT a school board) where a plaintiff was physically injured. Do not use: Palmetto Shores, Marcus Delray, Riverside Park, Officer Dana Whitmore, Suncoast Charter Academy, Priya Nambiar, Broward County School Board, Terrence Washington, Cypress Ridge, Horizon Academy, or any employment/whistle-blower/termination scenario.`
   }
 
   const history = existingCases.map(c => ({
@@ -124,17 +128,8 @@ function buildCaseHistory(existingCases) {
   return `\n\nEXISTING CASES (avoid repeating defendant names, municipality types, or incident types):\n${summaries.join('\n')}`
 }
 
-function getFallbackCase(currentDate) {
-  const base = ALL_FALLBACKS[fallbackIndex % ALL_FALLBACKS.length]
-  fallbackIndex++
-  const dateFiled = currentDate
-    ? addBusinessDays(currentDate, -Math.floor(Math.random() * 5 + 3))
-    : base.dateFiled
-  return {
-    ...base,
-    caseId: `LW-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, '0')}`,
-    dateFiled,
-  }
+function getFallbackCase() {
+  return getNextFallbackCase([])
 }
 
 export async function generateCase({ caseType = 'state_tort', playerLevel = 1, currentDate, constraints, existingCases }) {
@@ -195,6 +190,14 @@ Always make the fact scenario realistic to Florida governmental defense practice
       const parsed = JSON.parse(clean)
       validateCaseStructure(parsed)
 
+      // Hard prohibition check — force retry if banned defendant appears
+      const defendantLower = parsed.defendant.toLowerCase()
+      const isProhibited = PROHIBITED_DEFENDANTS.some(p => defendantLower.includes(p))
+      if (isProhibited) {
+        console.warn('Generated prohibited defendant:', parsed.defendant, '— retrying')
+        throw new Error('PROHIBITED_DEFENDANT')
+      }
+
       // Legal accuracy validation
       const validation = await validateCaseLegal(parsed)
 
@@ -210,10 +213,10 @@ Always make the fact scenario realistic to Florida governmental defense practice
       console.warn(`Case validation attempt ${attempt} failed:`, validation.errors)
     } catch (err) {
       if (attempt >= maxAttempts) {
-        return getFallbackCase(currentDate)
+        return getFallbackCase()
       }
     }
   }
 
-  return getFallbackCase(currentDate)
+  return getFallbackCase()
 }

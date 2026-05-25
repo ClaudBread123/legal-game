@@ -281,7 +281,7 @@ MANDATORY REQUIREMENTS:
 - Fact scenario must be 3-5 sentences
 - Must feel realistic to Florida practice
 
-PROHIBITED — DO NOT USE ANY OF THESE:
+ABSOLUTE PROHIBITION — NEVER USE ANY OF THESE:
 - Palmetto Shores or any variation
 - Marcus Delray or any variation
 - Riverside Park
@@ -289,8 +289,16 @@ PROHIBITED — DO NOT USE ANY OF THESE:
 - Negligent security at a park
 - Suncoast Charter Academy
 - Priya Nambiar
+- Broward County School Board
+- Terrence Washington
+- Cypress Ridge High School
+- Horizon Academy
+- Any employment case
+- Any whistle-blower or retaliation case
+- Any wrongful termination case
+- Any school board defendant
 
-Use a completely different Florida city or county, a different type of incident, and a different plaintiff name.`,
+You MUST generate a state tort case involving a Florida city or county municipality (NOT a school board) where the plaintiff was physically injured by a condition or act — a vehicle accident, slip and fall, premises defect, building failure, or similar. The plaintiff must be a private individual injured by a physical event.`,
         },
       })
       case1 = makeCaseObject({
