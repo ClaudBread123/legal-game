@@ -9,6 +9,7 @@ import CaseLog from '../components/case/CaseLog.jsx'
 import ManagingPartnerWidget from '../components/case/ManagingPartnerWidget.jsx'
 import CaseBudgetPanel from '../components/case/CaseBudgetPanel.jsx'
 import DeadlinePanel from '../components/case/DeadlinePanel.jsx'
+import ComplaintSlideOver from '../components/case/ComplaintSlideOver.jsx'
 
 const TABS = ['Complaint Analysis', 'Litigation Actions', 'Case Log', 'Timeline & Deadlines']
 
@@ -17,6 +18,7 @@ export default function CaseView() {
   const { cases } = useGameStore()
   const [activeTab, setActiveTab] = useState(0)
   const [issueEvaluation, setIssueEvaluation] = useState(null)
+  const [complaintOpen, setComplaintOpen] = useState(false)
 
   const caseObject = cases.find(c => c.caseId === caseId)
 
@@ -116,6 +118,38 @@ export default function CaseView() {
       <div style={{ width: '220px', flexShrink: 0 }}>
         <ManagingPartnerWidget caseObject={caseObject} issueEvaluation={issueEvaluation} />
       </div>
+
+      {/* Floating complaint button */}
+      {caseObject.complaintDocument && (
+        <button
+          onClick={() => setComplaintOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--accent-blue)',
+            color: 'var(--accent-blue)',
+            padding: '8px 20px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontFamily: 'var(--font-sans)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          📄 View Complaint
+        </button>
+      )}
+
+      <ComplaintSlideOver
+        isOpen={complaintOpen}
+        onClose={() => setComplaintOpen(false)}
+        caseObject={caseObject}
+      />
     </motion.div>
   )
 }

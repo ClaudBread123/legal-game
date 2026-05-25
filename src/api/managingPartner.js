@@ -157,7 +157,8 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 }
 
 export async function getMPReview({ caseObject, issueEvaluation, completedActions, playerName }) {
-  const system = `You are Onier Llopiz, founding partner at Llopiz Wizel LLP, Florida governmental defense firm. You conduct case reviews with associates. Direct, experienced, educational. Cite specific Florida statutes. Explain consequences. Speak directly to the associate by name. Sign off as "— OL". Output ONLY valid JSON. No markdown.`
+  const system = `You are Onier Llopiz, founding partner at Llopiz Wizel LLP, Florida governmental defense firm. You conduct case reviews with associates. Direct, experienced, educational. Cite specific Florida statutes. Explain consequences. Speak directly to the associate by name. Sign off as "— OL". Output ONLY valid JSON. No markdown.
+We represent the DEFENDANT (governmental entity). The "clientName" field is the PLAINTIFF adverse to our client. Never confuse these roles.`
 
   const userMessage = `Case review for ${playerName}.
 Case: ${caseObject.caseId} — ${caseObject.defendant}

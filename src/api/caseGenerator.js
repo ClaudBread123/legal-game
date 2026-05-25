@@ -75,6 +75,8 @@ function buildCaseSystemPrompt() {
   return `You generate Florida governmental defense cases for a law firm training game.
 Output ONLY valid JSON. No markdown. No text before or after the JSON object.
 
+Field roles: "defendant" = the Florida governmental entity WE DEFEND (our client). "clientName" = the PLAINTIFF (adverse party suing our client).
+
 Florida law rules:
 - §768.28(9): govt employees immune individually unless bad faith or malice
 - §768.28(6): pre-suit notice required. 18 months if incident >= 2026-10-01, else 3 years
@@ -218,12 +220,11 @@ Format as a formal Florida circuit court complaint: caption, COMES NOW, numbered
 }
 
 function assessOfflineHealth(caseObject) {
-  let health = 70
   const issues = caseObject.hiddenIssues || []
-  health -= issues.filter(i => i.severity === 'critical').length * 8
-  health -= issues.filter(i => i.severity === 'major').length * 4
-  if ((caseObject.claimsAsserted || []).some(c => c.includes('1983'))) health -= 5
-  return Math.max(35, Math.min(95, health))
+  const criticalCount = issues.filter(i => i.severity === 'critical').length
+  if (criticalCount >= 2) return 82
+  if (criticalCount === 1) return 72
+  return 65
 }
 
 export async function assessInitialCaseHealth(caseObject) {
@@ -234,15 +235,15 @@ Claims: ${(caseObject.claimsAsserted || []).join('; ')}
 Issues: ${(caseObject.hiddenIssues || []).map(i => i.issueType + '(' + i.severity + ')').join(', ')}
 HB145: ${caseObject.hb145Applicable}
 
-Rate initial defense strength 35-95 (lower = more plaintiff-favorable, higher = stronger defense). Consider immunity arguments, pre-suit compliance, §1983 exposure.
-Return JSON: {"caseHealth": 65, "rationale": "brief reason"}`
+Rate initial defense strength 50-90 (lower = more plaintiff-favorable, higher = stronger defense with more immunity arguments). Consider immunity arguments, pre-suit compliance, §1983 exposure.
+Return JSON: {"caseHealth": 72, "rationale": "brief reason"}`
 
   try {
     const response = await callClaude({ system, userMessage, maxTokens: 200 })
     const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
     const parsed = JSON.parse(clean)
     const h = parsed.caseHealth
-    if (typeof h === 'number' && h >= 35 && h <= 95) return Math.round(h)
+    if (typeof h === 'number') return Math.round(Math.min(90, Math.max(50, h)))
     return assessOfflineHealth(caseObject)
   } catch {
     return assessOfflineHealth(caseObject)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Modal from '../shared/Modal.jsx'
 import { evaluateResponse } from '../../api/evaluateResponse.js'
+import ComplaintSlideOver from './ComplaintSlideOver.jsx'
 
 const INSTRUCTIONS = {
   motion_to_dismiss: (c) =>
@@ -80,7 +81,7 @@ function ContextStep({ action, checkData, caseObject, onBegin }) {
 }
 
 // ── Step 2: Textarea ────────────────────────────────────
-function AnalysisStep({ action, caseObject, onSubmit }) {
+function AnalysisStep({ action, caseObject, onSubmit, onViewComplaint }) {
   const [text, setText] = useState('')
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length
   const ready = wordCount >= 50
@@ -96,7 +97,26 @@ function AnalysisStep({ action, caseObject, onSubmit }) {
         padding: '12px 14px', marginBottom: '14px', background: 'var(--bg-secondary)',
         border: '1px solid var(--border)', borderRadius: '6px',
         fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.65', whiteSpace: 'pre-line',
+        position: 'relative',
       }}>
+        {onViewComplaint && (
+          <button
+            onClick={onViewComplaint}
+            style={{
+              float: 'right', marginLeft: '8px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-muted)',
+              padding: '3px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontFamily: 'var(--font-sans)',
+            }}
+          >
+            View Complaint
+          </button>
+        )}
         {instruction}
       </div>
 
@@ -166,7 +186,7 @@ function EvaluatingStep() {
         Onier Llopiz is reviewing your analysis...
       </div>
       <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-        This takes about 15 seconds
+        This takes 20–30 seconds
       </div>
     </div>
   )
@@ -317,12 +337,14 @@ export default function FreeTextActionModal({
   const [step, setStep] = useState(1)
   const [evaluation, setEvaluation] = useState(null)
   const [playerText, setPlayerText] = useState('')
+  const [complaintOpen, setComplaintOpen] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
       setStep(1)
       setEvaluation(null)
       setPlayerText('')
+      setComplaintOpen(false)
     }
   }, [isOpen])
 
@@ -353,45 +375,53 @@ export default function FreeTextActionModal({
   if (!isOpen || !action) return null
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={step < 4 ? onClose : undefined}
-      title={step === 4 ? 'Evaluation Results' : step === 3 ? 'Evaluating…' : 'Case Analysis'}
-      wide
-    >
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {step === 1 && (
-            <ContextStep
-              action={action}
-              checkData={checkData}
-              caseObject={caseObject}
-              onBegin={() => setStep(2)}
-            />
-          )}
-          {step === 2 && (
-            <AnalysisStep
-              action={action}
-              caseObject={caseObject}
-              onSubmit={handleSubmitText}
-            />
-          )}
-          {step === 3 && <EvaluatingStep />}
-          {step === 4 && evaluation && (
-            <ResultsStep
-              evaluation={evaluation}
-              action={action}
-              onComplete={onComplete}
-            />
-          )}
-        </motion.div>
-      </AnimatePresence>
-    </Modal>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={step < 4 ? onClose : undefined}
+        title={step === 4 ? 'Evaluation Results' : step === 3 ? 'Evaluating…' : 'Case Analysis'}
+        wide
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {step === 1 && (
+              <ContextStep
+                action={action}
+                checkData={checkData}
+                caseObject={caseObject}
+                onBegin={() => setStep(2)}
+              />
+            )}
+            {step === 2 && (
+              <AnalysisStep
+                action={action}
+                caseObject={caseObject}
+                onSubmit={handleSubmitText}
+                onViewComplaint={() => setComplaintOpen(true)}
+              />
+            )}
+            {step === 3 && <EvaluatingStep />}
+            {step === 4 && evaluation && (
+              <ResultsStep
+                evaluation={evaluation}
+                action={action}
+                onComplete={onComplete}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </Modal>
+      <ComplaintSlideOver
+        isOpen={complaintOpen}
+        onClose={() => setComplaintOpen(false)}
+        caseObject={caseObject}
+      />
+    </>
   )
 }

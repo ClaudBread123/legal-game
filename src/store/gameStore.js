@@ -12,6 +12,15 @@ import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequences
 import { isApiAvailable, testApiConnection } from '../api/anthropicProxy.js'
 import { generatePublicRecordsResponse } from '../data/publicRecordsData.js'
 
+export function getCaseParties(caseObject) {
+  return {
+    ourClient: caseObject?.defendant,
+    adverseParty: caseObject?.clientName,
+    ourRole: 'Defense Counsel',
+    adverseRole: 'Plaintiff',
+  }
+}
+
 const SAVE_KEY = 'llw_save_v3'
 const OLD_SAVE_KEY = 'llw_save_v2'
 

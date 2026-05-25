@@ -14,7 +14,9 @@ export async function generateActionCheck({
   const systemPrompt = `You generate multiple choice questions testing Florida governmental defense law.
 Questions must reference the specific case facts.
 Output ONLY valid JSON. No markdown.
-Key law: §768.28(9) individual immunity, §768.28(6) pre-suit notice, HB145 caps (Oct 1 2026: $350k/$500k; before: $200k/$300k), §1983 removal within 30 days.`
+Key law: §768.28(9) individual immunity, §768.28(6) pre-suit notice, HB145 caps (Oct 1 2026: $350k/$500k; before: $200k/$300k), §1983 removal within 30 days.
+We represent the DEFENDANT (governmental entity). The "defendant" field is OUR CLIENT. Never refer to it as the plaintiff.
+ANSWER OPTION RULES: All four options must be similar length. All must sound plausible. The correct answer must NOT be the longest. Wrong answers should reflect common misconceptions. Randomize which letter (A/B/C/D) is correct.`
 
   const userPrompt = `Action: ${actionId}
 Case: ${caseObject.defendant} | Type: ${caseObject.caseType}

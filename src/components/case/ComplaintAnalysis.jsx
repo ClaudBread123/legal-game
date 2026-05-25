@@ -5,6 +5,7 @@ import { ISSUE_TYPES } from '../../data/issueTypes.js'
 import { evaluateIssueAnalysis } from '../../api/evaluateIssues.js'
 import { getMPReview } from '../../api/managingPartner.js'
 import Modal from '../shared/Modal.jsx'
+import ComplaintSlideOver from './ComplaintSlideOver.jsx'
 
 function useCountUp(target, duration = 1500) {
   const [value, setValue] = useState(0)
@@ -53,6 +54,7 @@ export default function ComplaintAnalysis({ caseObject }) {
   const [tooltip, setTooltip] = useState(null)
   const [mpModal, setMpModal] = useState(null)
   const [mpLoading, setMpLoading] = useState(false)
+  const [complaintOpen, setComplaintOpen] = useState(false)
 
   const alreadySubmitted = caseObject.issueAnalysisSubmitted === true
 
@@ -115,25 +117,43 @@ export default function ComplaintAnalysis({ caseObject }) {
     <div>
       {/* Complaint Document */}
       <div style={{ marginBottom: '28px' }}>
-        <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>
-          COMPLAINT — FOR REVIEW
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-muted)', fontWeight: 600 }}>
+            COMPLAINT — FOR REVIEW
+          </div>
+          {caseObject.complaintDocument && (
+            <button
+              onClick={() => setComplaintOpen(true)}
+              style={{
+                background: 'transparent', border: '1px solid var(--accent-blue)',
+                color: 'var(--accent-blue)', padding: '3px 12px', borderRadius: '4px',
+                fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              }}
+            >
+              View Full Complaint →
+            </button>
+          )}
         </div>
         {caseObject.complaintDocument ? (
           <div style={{
-            background: '#f8f6f0',
-            color: '#1a1a2e',
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: '13px',
-            lineHeight: '1.85',
-            padding: '40px',
-            borderRadius: '4px',
-            whiteSpace: 'pre-wrap',
-            maxHeight: '520px',
+            background: 'var(--bg-secondary)',
+            borderRadius: '0 4px 4px 0',
+            padding: '16px 20px',
+            maxHeight: '300px',
             overflowY: 'auto',
-            border: '1px solid #d4c9a8',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border)',
+            borderLeft: '3px solid var(--accent-blue)',
           }}>
-            {caseObject.complaintDocument}
+            <pre style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              lineHeight: '1.75',
+              color: 'var(--text-secondary)',
+              whiteSpace: 'pre-wrap',
+              margin: 0,
+            }}>
+              {caseObject.complaintDocument.substring(0, 800)}{caseObject.complaintDocument.length > 800 ? '\n\n[…click "View Full Complaint" to read more]' : ''}
+            </pre>
           </div>
         ) : (
           <div style={{
@@ -520,6 +540,12 @@ export default function ComplaintAnalysis({ caseObject }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ComplaintSlideOver
+        isOpen={complaintOpen}
+        onClose={() => setComplaintOpen(false)}
+        caseObject={caseObject}
+      />
 
       {/* MP Modal */}
       <Modal isOpen={!!mpModal} onClose={() => setMpModal(null)} title="CASE REVIEW" wide>

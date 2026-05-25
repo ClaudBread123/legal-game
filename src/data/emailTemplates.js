@@ -7,8 +7,8 @@ export const EMAIL_TEMPLATES = {
 
 A new matter has been assigned to you: ${ctx.caseId}.
 
-Client: ${ctx.clientName}
-Adverse Party: ${ctx.defendant}
+Matter: ${ctx.defendant} (Defense)
+Adverse Party: ${ctx.clientName} (Plaintiff)
 Case Type: ${ctx.caseType}
 
 I have reviewed the intake file. There are threshold issues that require your immediate attention. Review the complaint carefully before taking any action — the first 30 days on a governmental defense file are critical.

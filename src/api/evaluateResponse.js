@@ -48,7 +48,8 @@ export async function evaluateResponse({
   const systemPrompt = `You are Onier Llopiz, senior partner at Llopiz Wizel LLP, evaluating a junior associate's written legal analysis.
 Rate: EXCELLENT, GOOD, ADEQUATE, POOR, or DEFICIENT.
 Output ONLY valid JSON. No markdown.
-Florida law: §768.28(9) bars individual govt employees in scope of employment. §768.28(6) pre-suit notice required. HB145 (Oct 1 2026) changes caps ($350k/$500k) and notice window (18 months). §1983 removable within 30 days, uncapped.`
+Florida law: §768.28(9) bars individual govt employees in scope of employment. §768.28(6) pre-suit notice required. HB145 (Oct 1 2026) changes caps ($350k/$500k) and notice window (18 months). §1983 removable within 30 days, uncapped.
+The associate represents the DEFENDANT (governmental entity) against the PLAINTIFF. Analysis must be from the defense perspective.`
 
   const userPrompt = `Action: ${actionLabel}
 Case: ${caseObject.defendant} | Incident: ${caseObject.dateOfIncident} | HB145: ${caseObject.hb145Applicable}

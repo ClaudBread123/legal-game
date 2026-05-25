@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Modal from '../shared/Modal.jsx'
 import FirmLogo from '../shared/FirmLogo.jsx'
+import { LoadingSpinner } from '../shared/LoadingSpinner.jsx'
 
 function computeQuality(answersRecord) {
   if (answersRecord.length === 0) return 3
@@ -41,20 +42,13 @@ function LoadingStep() {
       justifyContent: 'center', padding: '60px 20px', gap: '20px',
     }}>
       <FirmLogo size="sm" />
-      <motion.div
-        animate={{ opacity: [0.4, 1, 0.4] }}
-        transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        style={{
-          width: '40px', height: '4px', borderRadius: '2px',
-          background: 'var(--accent-gold)',
-        }}
-      />
+      <LoadingSpinner size={32} />
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
           Preparing case-specific assessment...
         </div>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-          This takes about 10 seconds
+          This takes 20–30 seconds
         </div>
       </div>
     </div>

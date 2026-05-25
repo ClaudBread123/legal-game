@@ -12,11 +12,22 @@ const TO_OPTIONS = [
   { value: 'managing_partner', label: 'Onier Llopiz (Internal)' },
 ]
 
-const RATING_CONFIG = {
-  PROFESSIONAL: { color: '#4ade80', label: 'Professional' },
-  ACCEPTABLE: { color: '#4a9eff', label: 'Acceptable' },
-  CONCERNING: { color: 'var(--accent-yellow)', label: 'Concerning' },
-  INAPPROPRIATE: { color: 'var(--accent-red)', label: 'Inappropriate' },
+function getConsequenceRating(evaluation) {
+  if (!evaluation.isAppropriate) {
+    const fx = evaluation.consequences?.gameEffect
+    if (fx === 'termination_warning') return { label: 'Termination Warning', color: 'var(--accent-red)' }
+    if (fx === 'formal_warning') return { label: 'Formal Warning Issued', color: 'var(--accent-red)' }
+    if (fx === 'removed_from_case') return { label: 'Removed From Case', color: 'var(--accent-red)' }
+    if (fx === 'client_leaves') return { label: 'Client Terminated', color: '#b91c1c' }
+    if (fx === 'xp_penalty_large') return { label: 'Seriously Unprofessional', color: '#f97316' }
+    if (fx === 'xp_penalty_small') return { label: 'Unprofessional', color: 'var(--accent-yellow)' }
+    return { label: 'Inappropriate', color: 'var(--accent-red)' }
+  }
+  const score = evaluation.professionalismScore || 3
+  if (score >= 5) return { label: 'Excellent', color: '#4ade80' }
+  if (score >= 4) return { label: 'Professional', color: '#4ade80' }
+  if (score >= 3) return { label: 'Acceptable', color: '#4a9eff' }
+  return { label: 'Needs Improvement', color: 'var(--accent-yellow)' }
 }
 
 export default function ComposeModal({ isOpen, onClose, defaultCaseId }) {
@@ -58,6 +69,7 @@ export default function ComposeModal({ isOpen, onClose, defaultCaseId }) {
         body,
         caseObject: selectedCase,
         playerName: player?.name || 'Associate',
+        playerTitle: player?.title || 'Associate',
       })
       setEvaluation(result)
       setStep('result')
@@ -234,7 +246,7 @@ export default function ComposeModal({ isOpen, onClose, defaultCaseId }) {
         {step === 'result' && evaluation && (
           <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {(() => {
-              const cfg = RATING_CONFIG[evaluation.rating] || RATING_CONFIG.ACCEPTABLE
+              const cfg = getConsequenceRating(evaluation)
               return (
                 <>
                   <div style={{
@@ -246,42 +258,67 @@ export default function ComposeModal({ isOpen, onClose, defaultCaseId }) {
                       {cfg.label}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Email sent</div>
+                    {evaluation.professionalismScore && (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Professionalism: {evaluation.professionalismScore}/5
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ marginBottom: '14px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
                     {evaluation.feedback}
                   </div>
 
-                  {evaluation.concerns?.length > 0 && (
+                  {evaluation.issues?.length > 0 && (
                     <div style={{ marginBottom: '14px' }}>
-                      {evaluation.concerns.map((c, i) => (
+                      {evaluation.issues.map((issue, i) => (
                         <div key={i} style={{
                           padding: '8px 10px', marginBottom: '4px',
                           background: 'rgba(239,68,68,0.05)', border: '1px solid var(--accent-red)22',
                           borderRadius: '5px', fontSize: '12px', color: 'var(--text-secondary)',
-                        }}>⚠ {c}</div>
+                        }}>⚠ {issue}</div>
                       ))}
                     </div>
                   )}
 
-                  {evaluation.oniersNote && (
+                  {evaluation.floridaBarIssue?.exists && (
                     <div style={{
                       padding: '10px 12px', marginBottom: '14px',
-                      background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border)',
-                      fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic',
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid var(--accent-red)44',
+                      borderRadius: '6px',
                     }}>
-                      "{evaluation.oniersNote}" <span style={{ color: 'var(--accent-gold)', fontStyle: 'normal' }}>— OL</span>
+                      <div style={{ fontSize: '10px', color: 'var(--accent-red)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: '4px' }}>
+                        FLORIDA BAR RULE VIOLATION — {evaluation.floridaBarIssue.rule}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {evaluation.floridaBarIssue.description}
+                      </div>
                     </div>
                   )}
 
-                  {evaluation.xpEffect !== 0 && (
+                  {evaluation.consequences?.description && !evaluation.isAppropriate && (
                     <div style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      gap: '8px', marginBottom: '16px',
-                      fontFamily: 'var(--font-mono)', fontSize: '16px',
-                      color: evaluation.xpEffect > 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+                      padding: '10px 12px', marginBottom: '14px',
+                      background: 'var(--bg-secondary)', borderRadius: '6px', border: '1px solid var(--border)',
+                      fontSize: '12px', color: 'var(--text-secondary)',
                     }}>
-                      {evaluation.xpEffect > 0 ? '+' : ''}{evaluation.xpEffect} XP
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '4px' }}>CONSEQUENCE</div>
+                      {evaluation.consequences.description}
+                    </div>
+                  )}
+
+                  {evaluation.professionalVersion && (
+                    <div style={{
+                      padding: '10px 12px', marginBottom: '14px',
+                      background: 'rgba(74,158,255,0.05)', border: '1px solid rgba(74,158,255,0.2)',
+                      borderRadius: '6px',
+                    }}>
+                      <div style={{ fontSize: '10px', color: '#4a9eff', letterSpacing: '0.1em', fontWeight: 700, marginBottom: '4px' }}>
+                        SUGGESTED PROFESSIONAL VERSION
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', fontStyle: 'italic' }}>
+                        {evaluation.professionalVersion}
+                      </div>
                     </div>
                   )}
 
