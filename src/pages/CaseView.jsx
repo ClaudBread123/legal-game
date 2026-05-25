@@ -46,6 +46,36 @@ export default function CaseView() {
             ← Dashboard
           </Link>
         </div>
+
+        {/* Role indicator */}
+        <div style={{
+          background: 'rgba(201,168,76,0.06)', border: '1px solid var(--accent-gold)33',
+          borderRadius: '6px', padding: '10px 12px', marginBottom: '8px',
+        }}>
+          <div style={{
+            fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--accent-gold)',
+            letterSpacing: '0.15em', fontWeight: 700, marginBottom: '6px',
+          }}>
+            YOUR ROLE
+          </div>
+          <div style={{
+            display: 'inline-block', fontSize: '10px', fontFamily: 'var(--font-mono)',
+            fontWeight: 700, color: '#0f1117', background: 'var(--accent-gold)',
+            borderRadius: '3px', padding: '2px 7px', marginBottom: '8px',
+            letterSpacing: '0.05em',
+          }}>
+            DEFENSE COUNSEL
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '3px' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Client: </span>
+            {caseObject.defendant}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Adverse party: </span>
+            {caseObject.clientName}
+          </div>
+        </div>
+
         <CaseBudgetPanel caseObject={caseObject} />
         <DeadlinePanel caseObject={caseObject} />
       </div>

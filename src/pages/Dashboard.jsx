@@ -5,6 +5,7 @@ import CaseCard from '../components/dashboard/CaseCard.jsx'
 import PriorityAlerts from '../components/dashboard/PriorityAlerts.jsx'
 import ActivityFeed from '../components/dashboard/ActivityFeed.jsx'
 import PerformanceMeter from '../components/dashboard/PerformanceMeter.jsx'
+import CaseResolutionModal from '../components/case/CaseResolutionModal.jsx'
 import { formatGameDate, advanceBusinessDay } from '../utils/dateUtils.js'
 import { generateCase } from '../api/caseGenerator.js'
 
@@ -15,9 +16,12 @@ const pageVariants = {
 }
 
 export default function Dashboard() {
-  const { cases, currentDate, advanceDay, pendingCaseGeneration, addGeneratedCase, addToast, player } = useGameStore()
+  const { cases, currentDate, advanceDay, pendingCaseGeneration, addGeneratedCase, addToast, player, resolutionQueue, resolveCase } = useGameStore()
   const [advancing, setAdvancing] = useState(false)
   const activeCases = cases.filter(c => c.status !== 'closed')
+
+  const pendingResolution = resolutionQueue?.[0] || null
+  const resolutionCase = pendingResolution ? cases.find(c => c.caseId === pendingResolution.caseId) : null
   const nextDate = currentDate ? advanceBusinessDay(currentDate) : null
 
   // Handle pending case generation (async, triggered by advanceDay)
@@ -55,6 +59,7 @@ export default function Dashboard() {
   }
 
   return (
+    <>
     <motion.div
       variants={pageVariants}
       initial="initial"
@@ -123,5 +128,14 @@ export default function Dashboard() {
         </div>
       </div>
     </motion.div>
+
+    {pendingResolution && resolutionCase && (
+      <CaseResolutionModal
+        resolution={pendingResolution}
+        caseObject={resolutionCase}
+        onResolve={() => resolveCase(pendingResolution.caseId)}
+      />
+    )}
+    </>
   )
 }

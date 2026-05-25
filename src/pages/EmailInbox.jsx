@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../store/gameStore.js'
 import { formatShortDate, addBusinessDays } from '../utils/dateUtils.js'
+import ComposeModal from '../components/email/ComposeModal.jsx'
 
 const PRIORITY_BORDER = {
   urgent: 'var(--accent-red)',
@@ -51,6 +52,7 @@ export default function EmailInbox() {
   const [selected, setSelected] = useState(null)
   const [folder, setFolder] = useState('Inbox')
   const [selectedResponseOption, setSelectedResponseOption] = useState(null)
+  const [composing, setComposing] = useState(false)
 
   const emails = [...(storeEmails || [])].sort((a, b) => {
     // Response-required unread first
@@ -86,12 +88,25 @@ export default function EmailInbox() {
     : null
 
   return (
+    <>
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
       {/* Folder sidebar */}
       <div style={{
         width: '200px', flexShrink: 0, background: 'var(--bg-secondary)',
         borderRight: '1px solid var(--border)', padding: '20px 12px',
       }}>
+        <button
+          onClick={() => setComposing(true)}
+          style={{
+            width: '100%', height: '34px', marginBottom: '14px',
+            background: 'var(--accent-gold)', color: '#0f1117',
+            border: 'none', borderRadius: '6px',
+            fontFamily: 'var(--font-serif)', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          + Compose
+        </button>
         <div style={{
           fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em',
           marginBottom: '12px', fontWeight: 600, fontFamily: 'var(--font-sans)',
@@ -385,5 +400,8 @@ export default function EmailInbox() {
         )}
       </div>
     </div>
+
+    <ComposeModal isOpen={composing} onClose={() => setComposing(false)} />
+    </>
   )
 }

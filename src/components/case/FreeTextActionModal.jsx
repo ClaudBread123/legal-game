@@ -178,7 +178,8 @@ function ResultsStep({ evaluation, action, onComplete }) {
   const cfg = RATING_CONFIG[rating] || RATING_CONFIG.ADEQUATE
   const baseXP = action.xpReward || 50
   const multiplier = evaluation.xpMultiplier ?? 0.6
-  const earnedXP = Math.round(baseXP * multiplier)
+  const isScreened = evaluation.screened === true
+  const earnedXP = isScreened ? -25 : Math.round(baseXP * multiplier)
 
   return (
     <div>
@@ -255,24 +256,47 @@ function ResultsStep({ evaluation, action, onComplete }) {
       )}
 
       {/* XP */}
+      {isScreened && (
+        <div style={{
+          padding: '10px 12px', marginBottom: '14px',
+          background: 'rgba(239,68,68,0.08)', border: '1px solid var(--accent-red)44',
+          borderRadius: '6px', fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.5',
+        }}>
+          This response was screened before AI evaluation. You may attempt this action again unless this is your second failed attempt.
+        </div>
+      )}
+
       <div style={{
         padding: '12px 16px', marginBottom: '16px',
         background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}>
         <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontFamily: 'var(--font-mono)' }}>
-            Base: +{baseXP} XP × {Math.round(multiplier * 100)}%
-          </div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', color: 'var(--accent-green)', fontWeight: 700 }}>
-            +{earnedXP} XP
-          </div>
+          {isScreened ? (
+            <>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontFamily: 'var(--font-mono)' }}>
+                Screened — XP penalty
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', color: 'var(--accent-red)', fontWeight: 700 }}>
+                {earnedXP} XP
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', fontFamily: 'var(--font-mono)' }}>
+                Base: +{baseXP} XP × {Math.round(multiplier * 100)}%
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', color: 'var(--accent-green)', fontWeight: 700 }}>
+                +{earnedXP} XP
+              </div>
+            </>
+          )}
         </div>
         <div style={{ fontSize: '24px', color: cfg.color }}>{cfg.icon}</div>
       </div>
 
       <button
-        onClick={() => onComplete(evaluation.qualityScore ?? 2, earnedXP)}
+        onClick={() => onComplete(evaluation.qualityScore ?? 2, earnedXP, isScreened)}
         style={{
           width: '100%', height: '44px',
           background: cfg.color, color: rating === 'ADEQUATE' ? 'var(--text-primary)' : '#0f1117',

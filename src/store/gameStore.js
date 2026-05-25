@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { FALLBACK_CASES } from '../data/fallbackCases.js'
 import { generateCase } from '../api/caseGenerator.js'
+import { shouldTriggerResolution, determineResolutionPath } from '../utils/caseResolution.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { checkPromotionEligibility } from '../utils/scoring.js'
 import { getSimulatedStartDate, advanceBusinessDay, formatShortDate, addBusinessDays, daysBetween } from '../utils/dateUtils.js'
@@ -115,6 +116,10 @@ function makeCaseObject(c) {
     actionQualityScores: c.actionQualityScores ?? {},
     publicRecordsRequest: c.publicRecordsRequest ?? null,
     investigationFindings: c.investigationFindings ?? {},
+    actionAttempts: c.actionAttempts ?? {},
+    lockedActions: c.lockedActions ?? [],
+    resolutionTriggered: c.resolutionTriggered ?? false,
+    resolutionPath: c.resolutionPath ?? null,
   }
 }
 
@@ -172,6 +177,9 @@ const defaultPlayer = {
   casesWorked: 0,
   casesWorkedIds: [],
   totalBillableHours: 0,
+  formalWarnings: 0,
+  clientsLost: 0,
+  careerHealth: 100,
 }
 
 const CASE_GENERATION_SCHEDULE = [
@@ -186,6 +194,8 @@ const defaultState = {
   player: { ...defaultPlayer },
   cases: [],
   pendingCases: [],
+  closedCases: [],
+  resolutionQueue: [],
   gameStarted: false,
   currentDate: null,
   dailyActionsRemaining: 4,
@@ -435,6 +445,18 @@ export const useGameStore = create((set, get) => ({
       }
     })
 
+    // Case resolution check
+    const pendingResolutions = []
+    activeCases = activeCases.map(c => {
+      if (c.status === 'closed' || c.resolutionTriggered) return c
+      if (shouldTriggerResolution(c, nextDate)) {
+        const resolutionPath = determineResolutionPath(c)
+        pendingResolutions.push({ caseId: c.caseId, resolutionPath })
+        return { ...c, resolutionTriggered: true }
+      }
+      return c
+    })
+
     // Email response deadline tracking
     const overdueResponseEmails = []
     const currentEmails = state.emails || []
@@ -520,6 +542,7 @@ Timely responses to opposing counsel and court notices are not optional. This ha
       notifications: [...state.notifications, ...newNotifications],
       emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...publicRecordsEmails, ...overdueResponseEmails, ...updatedStoredEmails],
       generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
+      resolutionQueue: [...(state.resolutionQueue || []), ...pendingResolutions],
       activityFeed: [
         ...assignmentActivity,
         ...consequenceResult.newActivityEntries,
@@ -724,7 +747,7 @@ Timely responses to opposing counsel and court notices are not optional. This ha
     const promo = buildPromotionUpdate(updatedPlayer, state.currentDate, state)
 
     // Quality-based case health adjustment
-    const healthDelta = qualityScore === 3 ? 2 : qualityScore === 2 ? 0 : -5
+    const healthDelta = qualityScore === 3 ? 3 : qualityScore === 2 ? -3 : -20
     const healthEvent = healthDelta !== 0 ? {
       date: state.currentDate,
       event: `${actionId} — ${qualityScore === 3 ? 'Excellent' : qualityScore === 1 ? 'Deficient' : 'Adequate'} work`,
@@ -766,6 +789,128 @@ Timely responses to opposing counsel and court notices are not optional. This ha
       updated.emails = [promo.promoEmail, ...(state.emails || [])]
     }
 
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  recordFailedAttempt(caseId, actionId, healthPenalty = -30) {
+    const state = get()
+    const caseObj = state.cases.find(c => c.caseId === caseId)
+    if (!caseObj) return
+
+    const currentAttempts = caseObj.actionAttempts || {}
+    const currentCount = currentAttempts[actionId] || 0
+    const newCount = currentCount + 1
+    const isDoubleFail = newCount >= 2
+
+    const totalHealthDelta = healthPenalty + (isDoubleFail ? -40 : 0)
+    const newHealth = Math.max(0, (caseObj.caseHealth ?? 100) + totalHealthDelta)
+
+    const healthEvents = [{
+      date: state.currentDate,
+      event: `${actionId.replace(/_/g, ' ')} — screened (attempt ${newCount})`,
+      impact: healthPenalty,
+      description: isDoubleFail ? 'Action locked after repeated failures' : 'Response screened as non-legal content',
+      type: 'consequence',
+    }]
+
+    if (isDoubleFail) {
+      healthEvents.push({
+        date: state.currentDate,
+        event: `${actionId.replace(/_/g, ' ')} — LOCKED`,
+        impact: -40,
+        description: 'Action locked due to repeated deficient submissions',
+        type: 'consequence',
+      })
+    }
+
+    const updatedCase = {
+      ...caseObj,
+      actionAttempts: { ...currentAttempts, [actionId]: newCount },
+      lockedActions: isDoubleFail
+        ? [...(caseObj.lockedActions || []), actionId]
+        : (caseObj.lockedActions || []),
+      caseHealth: newHealth,
+      caseHealthEvents: [...(caseObj.caseHealthEvents || []), ...healthEvents],
+    }
+
+    const newEmails = []
+    if (isDoubleFail) {
+      newEmails.push({
+        id: makeEmailId(),
+        timestamp: state.currentDate,
+        read: false,
+        responded: false,
+        from: 'Onier Llopiz',
+        fromEmail: 'o.llopiz@llopizwizel.com',
+        to: state.player?.name || 'Associate',
+        subject: `Immediate Performance Concern — ${caseId}`,
+        priority: 'urgent',
+        body: `${state.player?.name || 'Associate'},
+
+You have submitted deficient responses on "${actionId.replace(/_/g, ' ')}" for ${caseId} twice. This action has been locked.
+
+This is not acceptable. We will be discussing this matter before you proceed further on this file.
+
+— OL`,
+      })
+    }
+
+    const updated = {
+      cases: state.cases.map(c => c.caseId === caseId ? updatedCase : c),
+      emails: [...newEmails, ...(state.emails || [])],
+      activityFeed: [
+        {
+          id: `failed-${Date.now()}`,
+          timestamp: state.currentDate,
+          message: `${caseId}: ${actionId.replace(/_/g, ' ')} — screened${isDoubleFail ? ' (action locked)' : ''}`,
+          type: 'warning',
+        },
+        ...(state.activityFeed || []),
+      ].slice(0, 50),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  resolveCase(caseId) {
+    const state = get()
+    const caseObj = state.cases.find(c => c.caseId === caseId)
+    const resolution = (state.resolutionQueue || []).find(r => r.caseId === caseId)
+    if (!caseObj || !resolution) return
+
+    const closedCase = {
+      ...caseObj,
+      status: 'closed',
+      closedDate: state.currentDate,
+      resolutionPath: resolution.resolutionPath,
+    }
+
+    const updated = {
+      cases: state.cases.map(c => c.caseId === caseId ? closedCase : c),
+      resolutionQueue: (state.resolutionQueue || []).filter(r => r.caseId !== caseId),
+      closedCases: [...(state.closedCases || []), closedCase],
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+
+    if (resolution.resolutionPath?.xpReward) {
+      get().addXP(resolution.resolutionPath.xpReward, `Case resolved — ${resolution.resolutionPath.label} (${caseId})`)
+    }
+  },
+
+  dismissResolutionModal(caseId) {
+    const state = get()
+    const updated = {
+      resolutionQueue: (state.resolutionQueue || []).filter(r => r.caseId !== caseId),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  updatePlayer(updates) {
+    const state = get()
+    const updated = { player: { ...state.player, ...updates } }
     set(updated)
     persist({ ...state, ...updated })
   },

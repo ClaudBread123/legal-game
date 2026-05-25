@@ -123,7 +123,7 @@ export const CONSEQUENCES = {
   initial_eval_overdue: {
     id: 'initial_eval_overdue',
     label: 'Initial Evaluation Overdue',
-    healthImpact: -10,
+    healthImpact: -15,
     probabilityShift: { strongWin: -5, settleDefense: -3, loss: 5, settleNeutral: 3 },
     description: 'The initial liability evaluation and litigation budget was not submitted within 30 days of assignment. Client and carrier have been left without guidance on exposure and strategy. This is a billable work compliance failure.',
     emailTemplate: 'initial_eval_overdue',
@@ -139,6 +139,16 @@ export const CONSEQUENCES = {
     emailTemplate: 'preservation_missed',
     locksActions: [],
     complicatesActions: ['motion_summary_judgment'],
+  },
+  compounding_failures: {
+    id: 'compounding_failures',
+    label: 'Compounding Systemic Failures',
+    healthImpact: -20,
+    probabilityShift: { strongWin: -10, loss: 8, settleNeutral: 2 },
+    description: 'Multiple procedural and strategic failures have compounded. The client\'s exposure has increased significantly. The managing partner has been advised.',
+    emailTemplate: null,
+    locksActions: [],
+    complicatesActions: [],
   },
 }
 
@@ -221,6 +231,13 @@ function evaluateCaseTriggers(c, currentDate) {
   if (!done('preservation_missed')) {
     if (!completed.includes('preservation_letter') && daysSinceFiling >= 21) {
       triggered.push('preservation_missed')
+    }
+  }
+
+  // 10. Compounding failures — 3+ consequences already triggered
+  if (!done('compounding_failures')) {
+    if (already.length + triggered.length >= 3) {
+      triggered.push('compounding_failures')
     }
   }
 

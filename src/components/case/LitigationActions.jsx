@@ -59,7 +59,7 @@ function getPrereqLabel(action) {
 }
 
 export default function LitigationActions({ caseObject }) {
-  const { dailyActionsRemaining, completeAction, billTime, spendAction, addXP, logActivity, addEmail, player } = useGameStore()
+  const { dailyActionsRemaining, completeAction, recordFailedAttempt, billTime, spendAction, addXP, logActivity, addEmail, player } = useGameStore()
   const [selectedPhaseId, setSelectedPhaseId] = useState('phase_1')
   const [modalAction, setModalAction] = useState(null)
   const [specialModal, setSpecialModal] = useState(null)
@@ -78,6 +78,7 @@ export default function LitigationActions({ caseObject }) {
 
   const completed = caseObject.completedActions || []
   const timestamps = caseObject.actionTimestamps || {}
+  const lockedActionIds = new Set(caseObject.lockedActions || [])
 
   const selectedPhase = LITIGATION_PHASES.find(p => p.id === selectedPhaseId) || LITIGATION_PHASES[0]
   const isSelectedUnlocked = isPhaseUnlocked(selectedPhase, completed)
@@ -145,7 +146,7 @@ export default function LitigationActions({ caseObject }) {
     billTime(caseObject.caseId, action.hours, action.label)
     spendAction(action.dailyActionCost)
 
-    const xpMultiplier = qualityScore === 3 ? 1.0 : qualityScore === 2 ? 0.6 : 0.2
+    const xpMultiplier = qualityScore === 3 ? 1.0 : qualityScore === 2 ? 0.5 : 0.0
     const earnedXP = Math.round(action.xpReward * xpMultiplier)
     addXP(earnedXP, `${action.label} — Quality ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
     logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
@@ -174,26 +175,33 @@ Please review the relevant statutes and come prepared to discuss this file.
     setTimeout(() => setCelebrateId(null), 1500)
   }
 
-  const handleFreeTextComplete = (qualityScore, earnedXP) => {
+  const handleFreeTextComplete = (qualityScore, earnedXP, isScreened = false) => {
     const action = freeTextModal.action
     setFreeTextModal({ isOpen: false, action: null, checkData: null })
     if (!action) return
 
-    completeAction(caseObject.caseId, action.id, qualityScore)
-    billTime(caseObject.caseId, action.hours, action.label)
-    spendAction(action.dailyActionCost)
-    addXP(earnedXP, `${action.label} — ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
-    logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
+    if (isScreened) {
+      // Screened: don't complete the action, record the failure, apply -25 XP
+      recordFailedAttempt(caseObject.caseId, action.id, -30)
+      spendAction(action.dailyActionCost)
+      addXP(earnedXP, `${action.label} — Screened (${caseObject.caseId})`)
+      logActivity(`${action.label} (${caseObject.caseId}) — screened, not completed`, 'warning')
+    } else {
+      completeAction(caseObject.caseId, action.id, qualityScore)
+      billTime(caseObject.caseId, action.hours, action.label)
+      spendAction(action.dailyActionCost)
+      addXP(earnedXP, `${action.label} — ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
+      logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
 
-    if (qualityScore === 1) {
-      addEmail({
-        from: 'Onier Llopiz',
-        fromEmail: 'o.llopiz@llopizwizel.com',
-        subject: `Analysis Flagged — ${caseObject.caseId}`,
-        priority: 'urgent',
-        requiresResponse: false,
-        caseId: caseObject.caseId,
-        body: `${player?.name || 'Associate'},
+      if (qualityScore === 1) {
+        addEmail({
+          from: 'Onier Llopiz',
+          fromEmail: 'o.llopiz@llopizwizel.com',
+          subject: `Analysis Flagged — ${caseObject.caseId}`,
+          priority: 'urgent',
+          requiresResponse: false,
+          caseId: caseObject.caseId,
+          body: `${player?.name || 'Associate'},
 
 Your written analysis on "${action.label}" (${caseObject.caseId}) has been reviewed and scored deficient.
 
@@ -202,11 +210,12 @@ Written analysis is not a formality — it is the foundation of strategy. If you
 We will discuss this file. Come prepared.
 
 — OL`,
-      })
-    }
+        })
 
-    setCelebrateId(action.id)
-    setTimeout(() => setCelebrateId(null), 1500)
+        setCelebrateId(action.id)
+        setTimeout(() => setCelebrateId(null), 1500)
+      }
+    }
   }
 
   return (
@@ -365,16 +374,17 @@ We will discuss this file. Come prepared.
             : selectedPhase.actions
           ).map(action => {
             const done = completed.includes(action.id)
+            const isLocked = lockedActionIds.has(action.id)
             const actionAvailable = isSelectedUnlocked && isActionAvailable(action, completed)
-            const canAct = actionAvailable && !done && dailyActionsRemaining >= action.dailyActionCost
+            const canAct = actionAvailable && !done && !isLocked && dailyActionsRemaining >= action.dailyActionCost
             const prereqLabel = isSelectedUnlocked && !done && !actionAvailable ? getPrereqLabel(action) : null
 
             return (
               <div key={action.id} style={{
                 background: 'var(--bg-card)',
-                border: `1px solid ${done ? 'var(--accent-green)' : 'var(--border)'}`,
+                border: `1px solid ${done ? 'var(--accent-green)' : isLocked ? 'var(--accent-red)44' : 'var(--border)'}`,
                 borderRadius: '8px', padding: '16px',
-                opacity: !isSelectedUnlocked ? 0.4 : prereqLabel ? 0.65 : 1,
+                opacity: !isSelectedUnlocked ? 0.4 : prereqLabel ? 0.65 : isLocked ? 0.6 : 1,
                 position: 'relative', overflow: 'hidden',
                 transition: 'opacity 200ms ease',
               }}>
@@ -463,6 +473,10 @@ We will discuss this file. Come prepared.
                   ) : !isSelectedUnlocked ? (
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       🔒 Phase locked
+                    </div>
+                  ) : isLocked ? (
+                    <div style={{ fontSize: '12px', color: 'var(--accent-red)', fontStyle: 'italic' }}>
+                      ⛔ Locked — repeated deficient submissions
                     </div>
                   ) : prereqLabel ? (
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>

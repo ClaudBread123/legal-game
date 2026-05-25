@@ -77,6 +77,11 @@ export default function CaseCard({ caseObject, index = 0 }) {
               fontFamily: 'var(--font-sans)', fontWeight: 500,
             }}>HB 145</span>
           )}
+          <span style={{
+            fontSize: '10px', padding: '2px 7px', borderRadius: '4px',
+            background: 'rgba(201,168,76,0.12)', color: 'var(--accent-gold)',
+            fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.04em',
+          }}>DEFENSE</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
           <StatusDot status={urgency} size={7} />

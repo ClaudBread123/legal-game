@@ -24,10 +24,12 @@ function healthColor(h) {
 }
 
 function healthLabel(h) {
-  if (h >= 80) return 'Case Positioned Well'
+  if (h >= 90) return 'Case Positioned Strongly'
+  if (h >= 75) return 'Case Positioned Well'
   if (h >= 60) return 'Case Manageable'
-  if (h >= 40) return 'Case Compromised'
-  if (h >= 20) return 'Case Seriously Compromised'
+  if (h >= 45) return 'Case Compromised'
+  if (h >= 30) return 'Case at Risk'
+  if (h >= 15) return 'Case Seriously Compromised'
   return 'Case in Jeopardy'
 }
 

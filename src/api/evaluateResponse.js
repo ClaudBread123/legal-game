@@ -2,6 +2,57 @@ import { callClaude } from './anthropicProxy.js'
 import { getLegalContextForAction } from '../data/legalKnowledgeBase.js'
 import { withConfidenceRetry } from './withConfidenceRetry.js'
 
+const LEGAL_SIGNALS = ['768', '1983', 'dismiss', 'motion', 'sovereign', 'immunity', 'statute', 'notice', 'claim', 'defendant', 'plaintiff', 'court', 'florida', 'liability', 'damages', 'discovery', 'deposition', 'summary', 'judgment', 'section', '§', 'rule', 'evidence', 'witness', 'counsel', 'filing', 'complaint', 'defense', 'exposure', 'government', 'municipal', 'charter', 'employment', 'discrimination', 'tort']
+
+const SCREENING_RESPONSES = {
+  too_short: {
+    rating: 'DEFICIENT',
+    qualityScore: 1,
+    xpMultiplier: 0.0,
+    screened: true,
+    summary: 'This response is too brief to constitute legal analysis. A minimum of 30 words is required to demonstrate any engagement with the legal issues.',
+    strengths: [],
+    gaps: [{ issue: 'Insufficient length', consequence: 'Cannot assess legal reasoning from fewer than 30 words', statute: null }],
+    modelApproach: 'Identify the applicable statutes, apply them to the specific facts of this case, and explain your reasoning with sufficient detail to demonstrate legal analysis.',
+    oniersNote: 'This is not a response — it is a sentence. Legal analysis requires more than this.',
+  },
+  repetitive: {
+    rating: 'DEFICIENT',
+    qualityScore: 1,
+    xpMultiplier: 0.0,
+    screened: true,
+    summary: 'This response consists of repetitive text that does not constitute legal analysis.',
+    strengths: [],
+    gaps: [{ issue: 'Repetitive content', consequence: 'Submitting filler text demonstrates no legal reasoning and cannot be evaluated', statute: null }],
+    modelApproach: 'Identify the applicable statutes, apply them to the facts, and explain your reasoning clearly and without repetition.',
+    oniersNote: 'I do not know what this is, but it is not legal analysis.',
+  },
+  no_legal_content: {
+    rating: 'DEFICIENT',
+    qualityScore: 1,
+    xpMultiplier: 0.0,
+    screened: true,
+    summary: 'This response contains no legal analysis. No statutes, legal concepts, or case-specific reasoning are present.',
+    strengths: [],
+    gaps: [{ issue: 'No legal content detected', consequence: 'Without legal analysis, no defense strategy can be built from this response', statute: null }],
+    modelApproach: 'Reference §768.28 and other applicable Florida statutes. Apply them to the specific facts and claims in this case. Identify threshold issues by name.',
+    oniersNote: 'You are an attorney. Write like one.',
+  },
+}
+
+function screenResponse(playerResponse) {
+  const text = playerResponse.trim()
+  const words = text.split(/\s+/)
+  const uniqueWords = new Set(words.map(w => w.toLowerCase()))
+  const wordCount = words.length
+  if (wordCount < 30) return { failed: true, reason: 'too_short' }
+  const uniqueRatio = uniqueWords.size / wordCount
+  if (uniqueRatio < 0.20 && wordCount > 20) return { failed: true, reason: 'repetitive' }
+  const hasLegalContent = LEGAL_SIGNALS.some(signal => text.toLowerCase().includes(signal))
+  if (!hasLegalContent) return { failed: true, reason: 'no_legal_content' }
+  return { failed: false }
+}
+
 export async function evaluateResponse({
   caseObject,
   actionId,
@@ -10,6 +61,9 @@ export async function evaluateResponse({
   playerTitle,
   checkData,
 }) {
+  const screen = screenResponse(playerResponse)
+  if (screen.failed) return SCREENING_RESPONSES[screen.reason]
+
   const legalContext = getLegalContextForAction(actionId, caseObject)
 
   const systemPrompt = `You are Onier Llopiz, senior partner at Llopiz Wizel LLP, evaluating a junior attorney's written legal analysis.
