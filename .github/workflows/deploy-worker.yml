@@ -3,8 +3,6 @@ name: Deploy Cloudflare Worker
 on:
   push:
     branches: [main]
-    paths:
-      - 'worker/**'
   workflow_dispatch:
 
 jobs:
@@ -20,20 +18,20 @@ jobs:
           node-version: 20
 
       - name: Install Wrangler
-        run: npm install -g wrangler
+        run: npm install -g wrangler@latest
 
       - name: Deploy Worker
         working-directory: worker
-        run: wrangler deploy
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Set Worker Secret
+      - name: Set Anthropic API Key Secret
         working-directory: worker
         run: |
-          echo "${{ secrets.ANTHROPIC_API_KEY }}" | \
-          wrangler secret put ANTHROPIC_API_KEY
+          echo "$ANTHROPIC_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

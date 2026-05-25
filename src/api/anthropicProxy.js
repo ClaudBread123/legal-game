@@ -1,5 +1,48 @@
 const PROXY_URL = import.meta.env.VITE_API_PROXY_URL
 
+export async function testApiConnection() {
+  console.log('API Test — Proxy URL:', PROXY_URL)
+
+  if (!PROXY_URL ||
+      PROXY_URL === 'PLACEHOLDER' ||
+      PROXY_URL === 'https://placeholder.example.com') {
+    return {
+      success: false,
+      reason: 'NO_PROXY_URL',
+      message: 'VITE_API_PROXY_URL not configured'
+    }
+  }
+
+  try {
+    const response = await fetch(PROXY_URL, { method: 'GET' })
+
+    if (response.ok) {
+      const data = await response.json()
+      return {
+        success: true,
+        hasApiKey: data.hasApiKey,
+        workerRunning: true,
+        message: data.hasApiKey
+          ? 'API fully operational'
+          : 'Worker running but API key missing'
+      }
+    }
+
+    return {
+      success: false,
+      reason: 'WORKER_ERROR',
+      status: response.status,
+      message: `Worker returned ${response.status}`
+    }
+  } catch (err) {
+    return {
+      success: false,
+      reason: 'CONNECTION_FAILED',
+      message: err.message
+    }
+  }
+}
+
 export function isApiAvailable() {
   return !!(
     PROXY_URL &&

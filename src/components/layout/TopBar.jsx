@@ -5,7 +5,7 @@ import { formatGameDate } from '../../utils/dateUtils.js'
 
 export default function TopBar() {
   const navigate = useNavigate()
-  const { player, currentDate, dailyActionsRemaining, dailyActionsTotal, emails } = useGameStore()
+  const { player, currentDate, dailyActionsRemaining, dailyActionsTotal, emails, apiStatus } = useGameStore()
   const unread = (emails || []).filter(e => !e.read).length
   const responseRequired = (emails || []).filter(e => e.requiresResponse && !e.responded && !e.responseOverdue).length
   const bellCount = unread + responseRequired
@@ -48,6 +48,23 @@ export default function TopBar() {
           </svg>
           {dailyActionsRemaining === 0 ? `0 / ${total} actions` : `${dailyActionsRemaining} / ${total} actions`}
         </span>
+
+        {/* API status indicator */}
+        {apiStatus === 'online' && (
+          <span style={{ color: 'var(--accent-green)', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+            ● AI
+          </span>
+        )}
+        {apiStatus === 'offline' && (
+          <span style={{ color: 'var(--accent-red)', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+            ● OFFLINE
+          </span>
+        )}
+        {apiStatus === 'no_key' && (
+          <span style={{ color: 'var(--accent-yellow)', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+            ● NO KEY
+          </span>
+        )}
 
         {/* Nav links */}
         <Link

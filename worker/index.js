@@ -1,45 +1,102 @@
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get("Origin") || ""
     const allowedOrigins = [
       "https://claudbread123.github.io",
       "http://localhost:5173",
-      "http://localhost:4173"
+      "http://localhost:4173",
+      "http://localhost:3000"
     ]
+
+    const origin = request.headers.get("Origin") || ""
     const corsOrigin = allowedOrigins.includes(origin)
       ? origin
       : "https://claudbread123.github.io"
 
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": corsOrigin,
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+    }
+
     if (request.method === "OPTIONS") {
       return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": corsOrigin,
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-          "Access-Control-Max-Age": "86400",
-        },
+        status: 204,
+        headers: corsHeaders
       })
     }
 
+    if (request.method === "GET") {
+      const hasKey = !!env.ANTHROPIC_API_KEY
+      return new Response(
+        JSON.stringify({
+          status: "Worker is running",
+          hasApiKey: hasKey,
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      )
+    }
+
     if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 })
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: corsHeaders
+      })
     }
 
     let body
     try {
       body = await request.json()
     } catch {
-      return new Response("Invalid JSON", { status: 400 })
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON" }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      )
     }
 
     const { system, userMessage, maxTokens = 1000 } = body
 
     if (!system || !userMessage) {
-      return new Response("Missing required fields", { status: 400 })
+      return new Response(
+        JSON.stringify({ error: "Missing required fields: system, userMessage" }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      )
+    }
+
+    if (!env.ANTHROPIC_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      )
     }
 
     try {
-      const response = await fetch(
+      const anthropicResponse = await fetch(
         "https://api.anthropic.com/v1/messages",
         {
           method: "POST",
@@ -57,41 +114,49 @@ export default {
         }
       )
 
-      if (!response.ok) {
-        const err = await response.text()
+      if (!anthropicResponse.ok) {
+        const errorText = await anthropicResponse.text()
         return new Response(
-          JSON.stringify({ error: "Anthropic API error", details: err }),
+          JSON.stringify({
+            error: "Anthropic API error",
+            status: anthropicResponse.status,
+            details: errorText
+          }),
           {
-            status: response.status,
+            status: anthropicResponse.status,
             headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": corsOrigin,
-            },
+              ...corsHeaders,
+              "Content-Type": "application/json"
+            }
           }
         )
       }
 
-      const data = await response.json()
+      const data = await anthropicResponse.json()
       const text = data.content
         .filter(b => b.type === "text")
         .map(b => b.text)
         .join("")
 
-      return new Response(JSON.stringify({ text }), {
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": corsOrigin,
-        },
-      })
+      return new Response(
+        JSON.stringify({ text }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
+        }
+      )
     } catch (err) {
       return new Response(
         JSON.stringify({ error: "Worker error", message: err.message }),
         {
           status: 500,
           headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": corsOrigin,
-          },
+            ...corsHeaders,
+            "Content-Type": "application/json"
+          }
         }
       )
     }

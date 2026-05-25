@@ -9,7 +9,7 @@ import { BILLING_RATE } from '../data/issueTypes.js'
 import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequencesEngine.js'
-import { isApiAvailable } from '../api/anthropicProxy.js'
+import { isApiAvailable, testApiConnection } from '../api/anthropicProxy.js'
 import { generatePublicRecordsResponse } from '../data/publicRecordsData.js'
 
 const SAVE_KEY = 'llw_save_v3'
@@ -207,6 +207,7 @@ const defaultState = {
   managingPartnerMessages: [],
   monthlyBillableHours: 0,
   apiAvailable: isApiAvailable(),
+  apiStatus: 'unknown',
   emails: [],
   generatedEmailEvents: [],
   staleGameCleared: false,
@@ -253,7 +254,14 @@ export const useGameStore = create((set, get) => ({
     set(baseState)
     persist(baseState)
 
-    // Step 2: Generate Case 1 — AWAIT fully before doing anything else
+    // Step 2: Check API status before attempting generation
+    const apiCheck = await get().checkApiStatus()
+    console.log('API check result:', apiCheck)
+    if (!apiCheck.success) {
+      console.warn('API offline — will use fallback cases')
+    }
+
+    // Step 3: Generate Case 1 — AWAIT fully before doing anything else
     let case1
     try {
       console.log('initGame: generating Case 1 via API')
@@ -302,7 +310,7 @@ Use a completely different Florida city or county, a different type of incident,
 
     const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)
 
-    // Step 3: Now set gameStarted: true WITH the case
+    // Step 4: Now set gameStarted: true WITH the case
     const stateWithCase = {
       cases: [case1],
       emails: [case1Email, ...welcomeEmails],
@@ -313,13 +321,13 @@ Use a completely different Florida city or county, a different type of incident,
     set(stateWithCase)
     persist({ ...baseState, ...stateWithCase })
 
-    // Step 4: Log activity
+    // Step 5: Log activity
     get().logActivity(
       `Welcome to Llopiz Wizel LLP, ${playerName}. Your caseload has been assigned.`,
       'info'
     )
 
-    // Step 5: Generate Case 2 in background (no await — can take time)
+    // Step 6: Generate Case 2 in background (no await — can take time)
     const case2Type = Math.random() > 0.5 ? 'section_1983' : 'employment'
     generateCase({
       caseType: case2Type,
@@ -1053,6 +1061,19 @@ This is not acceptable. We will be discussing this matter before you proceed fur
     }
     set(updated)
     persist({ ...state, ...updated })
+  },
+
+  async checkApiStatus() {
+    const result = await testApiConnection()
+    if (result.success && result.hasApiKey) {
+      set({ apiStatus: 'online', apiAvailable: true })
+    } else if (result.success && !result.hasApiKey) {
+      set({ apiStatus: 'no_key', apiAvailable: false })
+    } else {
+      set({ apiStatus: 'offline', apiAvailable: false })
+    }
+    console.log('API Status:', result)
+    return result
   },
 
   setApiAvailable(bool) {
