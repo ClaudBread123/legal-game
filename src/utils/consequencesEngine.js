@@ -281,6 +281,8 @@ export function evaluateConsequences(state) {
           id: makeEmailId(),
           timestamp: currentDate,
           read: false,
+          responded: false,
+          caseId: c.caseId,
           ...templateFn({ playerName, caseId: c.caseId }),
         })
       }

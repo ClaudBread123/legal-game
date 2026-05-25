@@ -49,6 +49,33 @@ Regards,
 ${ctx.opposingCounsel}
 Plaintiff's Counsel`,
     priority: 'urgent',
+    requiresResponse: true,
+    responseDeadlineGameDays: 2,
+    responseOptions: [
+      {
+        id: 'confirm',
+        label: 'Confirm availability',
+        text: `Thank you for the notice. We confirm availability for the hearing on ${ctx.hearingDate}.`,
+        consequence: null,
+        xp: 5,
+      },
+      {
+        id: 'object_time',
+        label: 'Object — insufficient hearing time',
+        text: 'We object to the 5-minute hearing allocation. The pending Motion to Dismiss raises substantial Florida governmental immunity issues requiring adequate argument time. We will be filing a motion for continuance and requesting a 30-minute hearing slot.',
+        consequence: 'mtd_hearing_recovered',
+        xp: 25,
+        note: 'Correct response. Objecting to inadequate hearing time and seeking 30 minutes is the right move.',
+      },
+      {
+        id: 'ignore',
+        label: 'Do not respond',
+        text: null,
+        consequence: 'mtd_5min_confirmed',
+        xp: -15,
+        note: 'Failing to respond confirms the 5-minute slot by default.',
+      },
+    ],
   }),
 
   depo_sequencing_warning: ctx => ({
@@ -80,6 +107,32 @@ Please confirm or contact me to reschedule within 5 days.
 Regards,
 ${ctx.opposingCounsel}`,
     priority: 'urgent',
+    requiresResponse: true,
+    responseDeadlineGameDays: 3,
+    responseOptions: [
+      {
+        id: 'confirm_date',
+        label: 'Confirm deposition date',
+        text: `We confirm availability for the deposition of our client's representative on ${ctx.depoDate}.`,
+        consequence: null,
+        xp: 5,
+      },
+      {
+        id: 'reschedule',
+        label: 'Request reschedule — conflict',
+        text: `We have a scheduling conflict on ${ctx.depoDate}. Please provide three alternative dates and we will confirm promptly.`,
+        consequence: null,
+        xp: 5,
+      },
+      {
+        id: 'counter_with_plaintiff_depo',
+        label: 'Counter — notice plaintiff depo first',
+        text: "Before proceeding with the deposition of our client, we intend to complete the deposition of your client. Please provide available dates for plaintiff's deposition. We will coordinate both depositions simultaneously.",
+        consequence: 'depo_sequencing_recovered',
+        xp: 20,
+        note: "Good instinct. Attempting to recover deposition sequencing is the right move, though opposing counsel may not agree.",
+      },
+    ],
   }),
 
   discovery_overdue: ctx => ({

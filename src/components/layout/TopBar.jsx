@@ -7,6 +7,8 @@ export default function TopBar() {
   const navigate = useNavigate()
   const { player, currentDate, dailyActionsRemaining, dailyActionsTotal, emails } = useGameStore()
   const unread = (emails || []).filter(e => !e.read).length
+  const responseRequired = (emails || []).filter(e => e.requiresResponse && !e.responded && !e.responseOverdue).length
+  const bellCount = unread + responseRequired
   const total = dailyActionsTotal || 4
 
   return (
@@ -77,7 +79,7 @@ export default function TopBar() {
           onClick={() => navigate('/email')}
           style={{
             position: 'relative', cursor: 'pointer', padding: '4px',
-            color: unread > 0 ? 'var(--accent-gold)' : 'var(--text-muted)',
+            color: responseRequired > 0 ? 'var(--accent-red)' : unread > 0 ? 'var(--accent-gold)' : 'var(--text-muted)',
             transition: 'color 150ms ease',
           }}
           title="Email Inbox"
@@ -86,7 +88,7 @@ export default function TopBar() {
             <path d="M3 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z" stroke="currentColor" strokeWidth="1.2"/>
             <path d="M3 5l6 5 6-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
-          {unread > 0 && (
+          {bellCount > 0 && (
             <div style={{
               position: 'absolute', top: '-2px', right: '-2px',
               width: '14px', height: '14px', borderRadius: '50%',
@@ -94,7 +96,7 @@ export default function TopBar() {
               fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontFamily: 'var(--font-mono)',
             }}>
-              {unread}
+              {bellCount}
             </div>
           )}
         </div>

@@ -2,12 +2,13 @@ import { create } from 'zustand'
 import { FALLBACK_CASES } from '../data/fallbackCases.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { checkPromotionEligibility } from '../utils/scoring.js'
-import { getSimulatedStartDate, advanceBusinessDay, formatShortDate } from '../utils/dateUtils.js'
+import { getSimulatedStartDate, advanceBusinessDay, formatShortDate, addBusinessDays, daysBetween } from '../utils/dateUtils.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
 import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences, DEFAULT_PROBABILITY } from '../utils/consequencesEngine.js'
 import { isApiAvailable } from '../api/anthropicProxy.js'
+import { generatePublicRecordsResponse } from '../data/publicRecordsData.js'
 
 const SAVE_KEY = 'llw_save_v2'
 const OLD_SAVE_KEY = 'llw_save_v1'
@@ -290,6 +291,100 @@ export const useGameStore = create((set, get) => ({
       })
     }
 
+    // Public records request responses
+    const publicRecordsEmails = []
+    activeCases = activeCases.map(c => {
+      const req = c.publicRecordsRequest
+      if (!req || req.status !== 'pending') return c
+      if (nextDate < req.responseDate) return c
+
+      const response = generatePublicRecordsResponse(req.categories || [], c)
+      const newHealth = Math.max(0, Math.min(100, (c.caseHealth ?? 100) + response.healthDelta))
+
+      const recordLines = response.records.map(r =>
+        `• ${r.description}${r.note ? `\n  → ${r.note}` : ''}`
+      ).join('\n')
+
+      let body = `Re: Public Records Request — ${c.caseId}\n\n`
+      body += `${response.summary}\n\n`
+      if (response.type === 'partial' && response.records.length > 0) {
+        body += `Records produced:\n\n${recordLines}\n\n`
+      }
+      if (response.educationalNote) {
+        body += `Note: ${response.educationalNote}\n\n`
+      }
+      body += `Please review and advise on follow-up actions needed.`
+
+      publicRecordsEmails.push({
+        id: makeEmailId(),
+        timestamp: nextDate,
+        read: false,
+        responded: false,
+        caseId: c.caseId,
+        from: `Records Unit, ${c.defendant}`,
+        fromEmail: 'records@govt.local',
+        subject: `Public Records Response — ${c.caseId}`,
+        priority: response.type === 'denied' ? 'high' : 'normal',
+        body,
+      })
+
+      return {
+        ...c,
+        caseHealth: newHealth,
+        publicRecordsRequest: { ...req, status: 'responded', responseType: response.type },
+        caseHealthEvents: [
+          ...(c.caseHealthEvents || []),
+          ...(response.healthDelta !== 0 ? [{
+            date: nextDate,
+            event: 'Public Records Response',
+            impact: response.healthDelta,
+            description: response.summary,
+            type: response.healthDelta >= 0 ? 'positive' : 'consequence',
+          }] : []),
+        ],
+      }
+    })
+
+    // Email response deadline tracking
+    const overdueResponseEmails = []
+    const currentEmails = state.emails || []
+    const updatedStoredEmails = currentEmails.map(email => {
+      if (!email.requiresResponse || email.responded || email.responseOverdue) return email
+      const daysSince = daysBetween(email.timestamp, nextDate)
+      if (daysSince < (email.responseDeadlineGameDays || 2)) return email
+
+      // Apply worst consequence
+      const worstOption = (email.responseOptions || []).find(o => o.xp < 0)
+      overdueResponseEmails.push({
+        id: makeEmailId(),
+        timestamp: nextDate,
+        read: false,
+        responded: false,
+        caseId: email.caseId,
+        from: 'Onier Llopiz',
+        fromEmail: 'o.llopiz@llopizwizel.com',
+        subject: `Response Overdue — ${email.subject}`,
+        priority: 'urgent',
+        body: `${state.player?.name || 'Associate'},
+
+You failed to respond to "${email.subject}" within the required timeframe. ${worstOption ? 'The default worst outcome has been applied.' : ''}
+
+Timely responses to opposing counsel and court notices are not optional. This has been noted in your file.
+
+— OL`,
+      })
+
+      newNotifications.push({
+        id: `email-overdue-${email.id}-${Date.now()}`,
+        message: `Response overdue: "${email.subject}"`,
+        read: false,
+        type: 'warning',
+        caseId: email.caseId,
+      })
+
+      return { ...email, responseOverdue: true }
+    })
+
     // Promotion check after advancing the day
     const updatedPlayerAfterDay = { ...state.player, totalGameDays: newTotalGameDays }
     const promo = buildPromotionUpdate(updatedPlayerAfterDay, nextDate, state)
@@ -312,7 +407,7 @@ export const useGameStore = create((set, get) => ({
       dailyActionsRemaining: dailyActions,
       dailyActionsTotal: dailyActions,
       notifications: [...state.notifications, ...newNotifications],
-      emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...(state.emails || [])],
+      emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...publicRecordsEmails, ...overdueResponseEmails, ...updatedStoredEmails],
       generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
       activityFeed: [
         ...assignmentActivity,
@@ -559,6 +654,101 @@ export const useGameStore = create((set, get) => ({
       cases: state.cases.map(c =>
         c.caseId === caseId ? { ...c, selectedExpertId: expertId } : c
       ),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  addEmail(emailData) {
+    const state = get()
+    const newEmail = {
+      id: makeEmailId(),
+      timestamp: state.currentDate,
+      read: false,
+      responded: false,
+      ...emailData,
+    }
+    const updated = { emails: [newEmail, ...(state.emails || [])] }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  submitPublicRecordsRequest(caseId, categories) {
+    const state = get()
+    const responseDate = addBusinessDays(state.currentDate, 10)
+    const updated = {
+      cases: state.cases.map(c =>
+        c.caseId === caseId
+          ? {
+              ...c,
+              publicRecordsRequest: {
+                dateSent: state.currentDate,
+                categories,
+                responseDate,
+                status: 'pending',
+              },
+            }
+          : c
+      ),
+    }
+    set(updated)
+    persist({ ...state, ...updated })
+  },
+
+  respondToEmail(emailId, optionId, xpAmount, consequence) {
+    const state = get()
+
+    const CONSEQUENCE_EFFECTS = {
+      mtd_hearing_recovered: 10,
+      depo_sequencing_recovered: 8,
+      mtd_5min_confirmed: -10,
+    }
+
+    const email = (state.emails || []).find(e => e.id === emailId)
+    let updatedCases = state.cases
+
+    if (consequence && email?.caseId) {
+      const delta = CONSEQUENCE_EFFECTS[consequence]
+      if (delta !== undefined) {
+        updatedCases = state.cases.map(c =>
+          c.caseId === email.caseId
+            ? {
+                ...c,
+                caseHealth: Math.max(0, Math.min(100, (c.caseHealth ?? 100) + delta)),
+                caseHealthEvents: [
+                  ...(c.caseHealthEvents || []),
+                  {
+                    date: state.currentDate,
+                    event: `Email response: ${consequence}`,
+                    impact: delta,
+                    description: `Response to: ${email.subject}`,
+                    type: delta >= 0 ? 'positive' : 'consequence',
+                  },
+                ],
+              }
+            : c
+        )
+      }
+    }
+
+    const newXP = (state.player?.xp || 0) + (xpAmount || 0)
+    const updatedPlayer = { ...state.player, xp: newXP }
+
+    const updated = {
+      emails: (state.emails || []).map(e =>
+        e.id === emailId ? { ...e, responded: true, responseOptionId: optionId } : e
+      ),
+      cases: updatedCases,
+      player: updatedPlayer,
+      activityFeed: [
+        {
+          id: `email-response-${Date.now()}`,
+          timestamp: state.currentDate,
+          message: `Email response sent: "${email?.subject || emailId}"`,
+          type: 'action',
+        },
+        ...(state.activityFeed || []),
+      ].slice(0, 50),
     }
     set(updated)
     persist({ ...state, ...updated })

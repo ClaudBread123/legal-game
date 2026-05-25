@@ -85,6 +85,8 @@ export const FALLBACK_CASES = [
     consequenceTimestamps: {},
     selectedExpertType: null,
     selectedExpertId: null,
+    publicRecordsRequest: null,
+    investigationFindings: {},
   },
   {
     caseId: 'LW-2025-0043',
@@ -151,5 +153,7 @@ export const FALLBACK_CASES = [
     consequenceTimestamps: {},
     selectedExpertType: null,
     selectedExpertId: null,
+    publicRecordsRequest: null,
+    investigationFindings: {},
   },
 ]

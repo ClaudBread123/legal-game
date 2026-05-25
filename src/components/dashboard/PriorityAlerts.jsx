@@ -113,9 +113,13 @@ function computeAlerts(cases, currentDate) {
 
 export default function PriorityAlerts() {
   const navigate = useNavigate()
-  const { cases, currentDate, notifications, markNotificationRead } = useGameStore()
+  const { cases, currentDate, notifications, markNotificationRead, emails } = useGameStore()
   const caseAlerts = computeAlerts(cases, currentDate)
   const storeAlerts = notifications.filter(n => !n.read).slice(0, 3)
+
+  const responseRequired = (emails || []).filter(
+    e => e.requiresResponse && !e.responded && !e.responseOverdue
+  ).length
 
   // Collect active consequences across all cases
   const activeConsequenceItems = []
@@ -129,7 +133,7 @@ export default function PriorityAlerts() {
     }
   }
 
-  const allEmpty = caseAlerts.length === 0 && storeAlerts.length === 0 && activeConsequenceItems.length === 0
+  const allEmpty = caseAlerts.length === 0 && storeAlerts.length === 0 && activeConsequenceItems.length === 0 && responseRequired === 0
 
   return (
     <div style={{
@@ -161,7 +165,30 @@ export default function PriorityAlerts() {
         </div>
       ) : (
         <>
-          {/* Active consequences section — shown first */}
+          {/* Email response required — shown first */}
+          {responseRequired > 0 && (
+            <div
+              onClick={() => navigate('/email')}
+              style={{
+                padding: '10px 12px', marginBottom: '10px', borderRadius: '6px',
+                background: 'rgba(239,68,68,0.12)', border: '1px solid var(--accent-red)66',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+              }}
+            >
+              <span style={{ fontSize: '16px' }}>📧</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '12px', color: 'var(--accent-red)', fontWeight: 700 }}>
+                  {responseRequired} email{responseRequired !== 1 ? 's' : ''} require your response
+                </span>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Click to open Email Inbox
+                </div>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--accent-red)', fontFamily: 'var(--font-mono)' }}>→</span>
+            </div>
+          )}
+
+          {/* Active consequences section */}
           {activeConsequenceItems.length > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{

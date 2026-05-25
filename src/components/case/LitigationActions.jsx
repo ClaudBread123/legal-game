@@ -3,9 +3,19 @@ import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore.js'
 import LITIGATION_PHASES, { LITIGATION_ACTIONS } from '../../data/litigationActions.js'
 import ExpertPanel from './ExpertPanel.jsx'
+import InvestigationResults from './InvestigationResults.jsx'
+import PublicRecordsRequest from './PublicRecordsRequest.jsx'
+import StatusUpdateModal from './StatusUpdateModal.jsx'
 import Modal from '../shared/Modal.jsx'
 
 const EXPERT_WIZARD_ACTION_IDS = new Set(['identify_expert', 'select_expert', 'retain_expert'])
+
+const SPECIAL_MODAL_TYPES = {
+  background_check: 'investigation_background',
+  social_media_search: 'investigation_social',
+  public_records_request: 'public_records',
+  status_update_client: 'status_update',
+}
 
 function isPhaseUnlocked(phase, completedActions) {
   if (phase.id === 'phase_1') return true
@@ -36,6 +46,7 @@ export default function LitigationActions({ caseObject }) {
   const { dailyActionsRemaining, completeAction, billTime, spendAction, addXP, logActivity } = useGameStore()
   const [selectedPhaseId, setSelectedPhaseId] = useState('phase_1')
   const [modalAction, setModalAction] = useState(null)
+  const [specialModal, setSpecialModal] = useState(null)
   const [celebrateId, setCelebrateId] = useState(null)
 
   const completed = caseObject.completedActions || []
@@ -322,7 +333,11 @@ export default function LitigationActions({ caseObject }) {
                     </div>
                   ) : (
                     <button
-                      onClick={() => setModalAction(action)}
+                      onClick={() => {
+                        const specialType = SPECIAL_MODAL_TYPES[action.id]
+                        if (specialType) setSpecialModal({ action, type: specialType })
+                        else setModalAction(action)
+                      }}
                       disabled={!canAct}
                       style={{
                         background: canAct ? selectedPhase.color : 'var(--border)',
@@ -344,6 +359,55 @@ export default function LitigationActions({ caseObject }) {
           </div>
         </>
       )}
+
+      {/* Investigation results modal */}
+      <Modal
+        isOpen={!!specialModal && (specialModal.type === 'investigation_background' || specialModal.type === 'investigation_social')}
+        onClose={() => setSpecialModal(null)}
+        title={specialModal?.type === 'investigation_social' ? 'Social Media Search Results' : 'Investigation Results'}
+        wide
+      >
+        {specialModal && (specialModal.type === 'investigation_background' || specialModal.type === 'investigation_social') && (
+          <InvestigationResults
+            type={specialModal.type === 'investigation_social' ? 'social_media' : 'background'}
+            caseObject={caseObject}
+            action={specialModal.action}
+            onClose={() => setSpecialModal(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Public records request modal */}
+      <Modal
+        isOpen={!!specialModal && specialModal.type === 'public_records'}
+        onClose={() => setSpecialModal(null)}
+        title="Florida Public Records Request"
+        wide
+      >
+        {specialModal?.type === 'public_records' && (
+          <PublicRecordsRequest
+            caseObject={caseObject}
+            action={specialModal.action}
+            onClose={() => setSpecialModal(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Status update modal */}
+      <Modal
+        isOpen={!!specialModal && specialModal.type === 'status_update'}
+        onClose={() => setSpecialModal(null)}
+        title="Client Status Report"
+        wide
+      >
+        {specialModal?.type === 'status_update' && (
+          <StatusUpdateModal
+            caseObject={caseObject}
+            action={specialModal.action}
+            onClose={() => setSpecialModal(null)}
+          />
+        )}
+      </Modal>
 
       {/* Confirm modal */}
       <Modal isOpen={!!modalAction} onClose={() => setModalAction(null)} title={modalAction?.label}>

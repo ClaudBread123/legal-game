@@ -22,6 +22,8 @@ function makeEmail(templateFn, ctx, state) {
     id,
     timestamp: state.currentDate,
     read: false,
+    responded: false,
+    caseId: ctx.caseId || null,
     ...emailData,
   }
 }
