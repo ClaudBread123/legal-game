@@ -39,6 +39,24 @@ export function createEmailSlice(set, get) {
       persist({ ...state, ...updated })
     },
 
+    updateEmail(emailId, updates) {
+      const state = get()
+      const updated = {
+        emails: (state.emails || []).map(e => e.id === emailId ? { ...e, ...updates } : e),
+      }
+      set(updated)
+      persist({ ...state, ...updated })
+    },
+
+    addPendingEmail(emailObj) {
+      const state = get()
+      const updated = {
+        pendingEmails: [...(state.pendingEmails || []), emailObj],
+      }
+      set(updated)
+      persist({ ...state, ...updated })
+    },
+
     respondToEmail(emailId, optionId, xpAmount, consequence) {
       const state = get()
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useGameStore } from '../store/gameStore.js'
 import { formatShortDate, addBusinessDays } from '../utils/dateUtils.js'
+import { callClaude } from '../api/anthropicProxy.js'
 import ComposeModal from '../components/email/ComposeModal.jsx'
 
 const PRIORITY_BORDER = {
@@ -47,12 +48,48 @@ function ResponseRequiredBadge() {
   )
 }
 
+function scheduleOpposingReply(email, replyText, attorney, deliveryDate) {
+  const style = attorney?.style || 'aggressive'
+  const name = attorney?.name || "Plaintiff's Counsel"
+  const sig = attorney?.signatureStyle || "Plaintiff's Counsel"
+  const emailAddr = attorney?.email || 'counsel@plaintifflaw.com'
+
+  const STYLE_REPLIES = {
+    aggressive: `Counsel,\n\nWe acknowledge your letter. We find your position without merit and will proceed accordingly.\n\nDo not expect us to stand down on this.\n\n${sig}`,
+    scorched_earth: `Counsel,\n\nWe have reviewed your correspondence. We reject the position set forth therein and reserve all rights. Expect further motions practice.\n\n${sig}`,
+    methodical: `Counsel,\n\nThank you for your correspondence. We will review the matter and respond substantively in due course.\n\n${sig}`,
+    settlement_focused: `Counsel,\n\nThank you for your letter. We remain open to discussing a resolution of this matter at an appropriate time.\n\n${sig}`,
+    civil_rights_specialist: `Counsel,\n\nWe have reviewed your letter. Our client's constitutional claims remain fully viable and we intend to pursue them vigorously.\n\n${sig}`,
+    strategic: `Counsel,\n\nWe acknowledge receipt of your correspondence and will advise accordingly.\n\n${sig}`,
+    plaintiff_champion: `Counsel,\n\nWe have reviewed your response. Our client deserves justice and we will not rest until they receive it.\n\n${sig}`,
+    employment_specialist: `Counsel,\n\nThank you for your letter. We note your position and will respond as appropriate under the applicable administrative and litigation framework.\n\n${sig}`,
+  }
+
+  const body = STYLE_REPLIES[style] || STYLE_REPLIES.methodical
+
+  return {
+    id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+    timestamp: deliveryDate,
+    read: false,
+    responded: false,
+    caseId: email.caseId || null,
+    from: name,
+    fromEmail: emailAddr,
+    subject: `Re: ${email.subject}`,
+    priority: attorney?.aggressiveness >= 8 ? 'high' : 'normal',
+    body,
+  }
+}
+
 export default function EmailInbox() {
-  const { emails: storeEmails, markEmailRead, respondToEmail } = useGameStore()
+  const { emails: storeEmails, markEmailRead, respondToEmail, updateEmail, addPendingEmail, currentDate } = useGameStore()
   const [selected, setSelected] = useState(null)
   const [folder, setFolder] = useState('Inbox')
   const [selectedResponseOption, setSelectedResponseOption] = useState(null)
   const [composing, setComposing] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [replyEval, setReplyEval] = useState(null)
+  const [evaluating, setEvaluating] = useState(false)
 
   const emails = [...(storeEmails || [])].sort((a, b) => {
     // Response-required unread first
@@ -69,7 +106,58 @@ export default function EmailInbox() {
   const handleSelect = email => {
     setSelected(email)
     setSelectedResponseOption(null)
+    setReplyText('')
+    setReplyEval(null)
     if (!email.read) markEmailRead(email.id)
+  }
+
+  const handleManualReply = async () => {
+    if (!selectedEmail || !replyText.trim() || evaluating) return
+    setEvaluating(true)
+    setReplyEval(null)
+    try {
+      const system = `You evaluate email replies from a Florida governmental defense associate at a law firm. Output ONLY valid JSON. Schema: {"professionalismScore": 0-100, "isAppropriate": boolean, "feedback": "1-2 sentences", "suggestion": "improved version or null if already good", "floridaBarIssue": boolean, "floridaBarNote": "null or brief explanation if issue exists"}`
+      const userMessage = `Original email subject: ${selectedEmail.subject}
+From: ${selectedEmail.from}
+Body: ${selectedEmail.body?.substring(0, 500)}
+
+Associate's reply:
+${replyText}
+
+Evaluate this reply for professionalism, appropriateness for Florida legal practice, and Florida Bar compliance.`
+
+      const response = await callClaude({ system, userMessage, maxTokens: 350 })
+      const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+      const evalData = JSON.parse(clean)
+      setReplyEval(evalData)
+
+      // Store eval on the email and mark responded
+      updateEmail(selectedEmail.id, {
+        responded: true,
+        manualReply: replyText,
+        manualReplyEval: evalData,
+        manualReplyDate: currentDate,
+      })
+
+      // Schedule opposing attorney reply for next day if email is from opposing counsel
+      const isFromOpposing = selectedEmail.from && !selectedEmail.from.includes('Llopiz') && !selectedEmail.from.includes('Santos') && !selectedEmail.from.includes('Wizel')
+      if (isFromOpposing) {
+        const deliveryDate = addBusinessDays(currentDate, 1)
+        // Find the opposing attorney from the email - look at from field
+        const attorney = null // will use canned style from scheduleOpposingReply defaults
+        const opposingReply = scheduleOpposingReply(selectedEmail, replyText, attorney, deliveryDate)
+        addPendingEmail(opposingReply)
+      }
+    } catch {
+      setReplyEval({ professionalismScore: null, isAppropriate: null, feedback: 'Reply sent. (Evaluation unavailable offline.)', suggestion: null, floridaBarIssue: false })
+      updateEmail(selectedEmail.id, {
+        responded: true,
+        manualReply: replyText,
+        manualReplyDate: currentDate,
+      })
+    } finally {
+      setEvaluating(false)
+    }
   }
 
   const handleSendResponse = () => {
@@ -389,6 +477,130 @@ export default function EmailInbox() {
                       </div>
                     </div>
                   </>
+                )}
+              </div>
+            )}
+
+            {/* Manual reply section — available on all emails */}
+            {selectedEmail && !selectedEmail.responded && !selectedEmail.manualReply && (
+              <div style={{
+                borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px',
+              }}>
+                <div style={{
+                  fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em',
+                  marginBottom: '10px', fontFamily: 'var(--font-mono)',
+                }}>
+                  {selectedEmail.requiresResponse ? 'OR — WRITE CUSTOM REPLY' : 'REPLY'}
+                </div>
+                <textarea
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Type your reply..."
+                  rows={5}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    borderRadius: '6px', color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-sans)', fontSize: '13px', lineHeight: '1.6',
+                    padding: '10px 12px', resize: 'vertical',
+                    outline: 'none',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
+                  <button
+                    onClick={handleManualReply}
+                    disabled={!replyText.trim() || evaluating}
+                    style={{
+                      height: '36px', padding: '0 18px',
+                      background: replyText.trim() && !evaluating ? 'var(--accent-gold)' : 'var(--border)',
+                      color: replyText.trim() && !evaluating ? '#0f1117' : 'var(--text-muted)',
+                      border: 'none', borderRadius: '6px',
+                      fontFamily: 'var(--font-serif)', fontSize: '13px', fontWeight: 600,
+                      cursor: replyText.trim() && !evaluating ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {evaluating ? 'Evaluating…' : 'Send & Evaluate'}
+                  </button>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Your reply will be graded for professionalism.
+                  </span>
+                </div>
+
+                {/* Evaluation result */}
+                {replyEval && (
+                  <div style={{
+                    marginTop: '14px', padding: '14px 16px', borderRadius: '6px',
+                    background: replyEval.isAppropriate === false
+                      ? 'rgba(239,68,68,0.06)' : 'rgba(74,222,128,0.06)',
+                    border: `1px solid ${replyEval.isAppropriate === false ? 'rgba(239,68,68,0.3)' : 'rgba(74,222,128,0.25)'}`,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{
+                        fontSize: '11px', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em',
+                        color: replyEval.isAppropriate === false ? 'var(--accent-red)' : '#4ade80',
+                      }}>
+                        {replyEval.isAppropriate === false ? '⚠ PROFESSIONALISM ISSUE' : '✓ REPLY EVALUATED'}
+                      </div>
+                      {replyEval.professionalismScore !== null && (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)', fontSize: '13px',
+                          color: replyEval.professionalismScore >= 70 ? '#4ade80'
+                            : replyEval.professionalismScore >= 50 ? 'var(--accent-yellow)'
+                            : 'var(--accent-red)',
+                        }}>
+                          {replyEval.professionalismScore}/100
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: replyEval.suggestion ? '10px' : '0' }}>
+                      {replyEval.feedback}
+                    </div>
+                    {replyEval.floridaBarIssue && replyEval.floridaBarNote && (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--accent-red)', lineHeight: '1.5' }}>
+                        ⚠ Florida Bar: {replyEval.floridaBarNote}
+                      </div>
+                    )}
+                    {replyEval.suggestion && (
+                      <div style={{
+                        marginTop: '10px', padding: '10px 12px',
+                        background: 'var(--bg-card)', borderRadius: '4px',
+                        borderLeft: '3px solid var(--accent-blue)',
+                      }}>
+                        <div style={{ fontSize: '10px', color: 'var(--accent-blue)', letterSpacing: '0.08em', marginBottom: '4px' }}>
+                          SUGGESTED VERSION
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', whiteSpace: 'pre-wrap', fontStyle: 'italic' }}>
+                          {replyEval.suggestion}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Show sent manual reply */}
+            {selectedEmail?.manualReply && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px' }}>
+                <div style={{ fontSize: '11px', color: '#4ade80', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}>
+                  ✓ REPLY SENT
+                </div>
+                <div style={{
+                  padding: '10px 14px', borderRadius: '6px', background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text-secondary)',
+                  lineHeight: '1.6', whiteSpace: 'pre-wrap', fontStyle: 'italic',
+                }}>
+                  {selectedEmail.manualReply}
+                </div>
+                {selectedEmail.manualReplyEval?.professionalismScore !== undefined && (
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Professionalism: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                      {selectedEmail.manualReplyEval.professionalismScore}/100
+                    </span>
+                    {selectedEmail.manualReplyEval.floridaBarIssue && (
+                      <span style={{ marginLeft: '10px', color: 'var(--accent-red)' }}>⚠ Bar issue flagged</span>
+                    )}
+                  </div>
                 )}
               </div>
             )}

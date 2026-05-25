@@ -5,7 +5,7 @@ import { ISSUE_TYPES } from '../../data/issueTypes.js'
 import { evaluateIssueAnalysis } from '../../api/evaluateIssues.js'
 import { getMPReview } from '../../api/managingPartner.js'
 import Modal from '../shared/Modal.jsx'
-import ComplaintSlideOver from './ComplaintSlideOver.jsx'
+import ComplaintModal from './ComplaintModal.jsx'
 
 function useCountUp(target, duration = 1500) {
   const [value, setValue] = useState(0)
@@ -541,7 +541,7 @@ export default function ComplaintAnalysis({ caseObject }) {
         )}
       </AnimatePresence>
 
-      <ComplaintSlideOver
+      <ComplaintModal
         isOpen={complaintOpen}
         onClose={() => setComplaintOpen(false)}
         caseObject={caseObject}

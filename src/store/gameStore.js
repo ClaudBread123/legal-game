@@ -5,6 +5,7 @@ import { shouldTriggerResolution, determineResolutionPath } from '../utils/caseR
 import { getSimulatedStartDate, advanceBusinessDay, daysBetween } from '../utils/dateUtils.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences } from '../utils/consequencesEngine.js'
+import { runAdversarialEvents } from '../utils/adversarialEngine.js'
 import { isApiAvailable, testApiConnection } from '../api/anthropicProxy.js'
 import { generatePublicRecordsResponse } from '../data/publicRecordsData.js'
 import { createPlayerSlice } from './slices/playerSlice.js'
@@ -212,6 +213,9 @@ You MUST generate a state tort case involving a Florida city or county municipal
     const newTotalGameDays = (state.player.totalGameDays || 0) + 1
     const stateWithNextDate = { ...state, currentDate: nextDate }
 
+    // Deliver pending emails queued from previous day (manual reply opposing responses)
+    const deliveredPendingEmails = (state.pendingEmails || []).map(e => ({ ...e, to: state.player.name }))
+
     const newEmailResults = checkAndGenerateEmails(state)
     const newEmails = newEmailResults.filter(r => r.email).map(r => ({ ...r.email, to: state.player.name }))
     const newEventKeys = newEmailResults.map(r => r.key)
@@ -245,6 +249,18 @@ You MUST generate a state tort case involving a Florida city or county municipal
     let activeCases = consequenceResult.updatedCases.map(c =>
       emailCaseUpdates[c.caseId] ? { ...c, ...emailCaseUpdates[c.caseId] } : c
     )
+
+    // Run adversarial events against the updated state
+    const adversarialState = { ...stateWithNextDate, cases: activeCases }
+    const adversarialResults = runAdversarialEvents(adversarialState)
+    const adversarialEmails = adversarialResults.newEmails.map(r => ({ ...r.email, to: state.player.name }))
+    newNotifications.push(...adversarialResults.newNotifications)
+    // Apply adversarial case health updates
+    activeCases = activeCases.map(c => {
+      const adv = adversarialResults.caseUpdates[c.caseId]
+      return adv ? { ...c, ...adv } : c
+    })
+
     let pendingCases = state.pendingCases || []
     const assignmentEmails = []
     const assignmentActivity = []
@@ -324,6 +340,13 @@ You MUST generate a state tort case involving a Florida city or county municipal
     })
 
     const pendingResolutions = []
+    // Add adversarial resolution items (e.g., MTD granted by court)
+    for (const item of adversarialResults.newResolutionItems || []) {
+      pendingResolutions.push({ caseId: item.caseId, resolutionPath: item.resolutionPath })
+      activeCases = activeCases.map(c =>
+        c.caseId === item.caseId ? { ...c, resolutionTriggered: true } : c
+      )
+    }
     activeCases = activeCases.map(c => {
       if (c.status === 'closed' || c.resolutionTriggered) return c
       if (shouldTriggerResolution(c, nextDate)) {
@@ -414,8 +437,9 @@ Timely responses to opposing counsel and court notices are not optional. This ha
       dailyActionsRemaining: dailyActions,
       dailyActionsTotal: dailyActions,
       notifications: [...state.notifications, ...newNotifications],
-      emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...publicRecordsEmails, ...overdueResponseEmails, ...updatedStoredEmails],
-      generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys],
+      emails: [...assignmentEmails, ...consequenceEmails, ...newEmails, ...adversarialEmails, ...deliveredPendingEmails, ...publicRecordsEmails, ...overdueResponseEmails, ...updatedStoredEmails],
+      generatedEmailEvents: [...(state.generatedEmailEvents || []), ...newEventKeys, ...(adversarialResults.newEventKeys || [])],
+      pendingEmails: [],
       resolutionQueue: [...(state.resolutionQueue || []), ...pendingResolutions],
       activityFeed: [
         ...assignmentActivity,

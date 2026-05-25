@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Modal from '../shared/Modal.jsx'
 import { evaluateResponse } from '../../api/evaluateResponse.js'
-import ComplaintSlideOver from './ComplaintSlideOver.jsx'
+import ComplaintModal from './ComplaintModal.jsx'
 
 const INSTRUCTIONS = {
   motion_to_dismiss: (c) =>
@@ -417,7 +417,7 @@ export default function FreeTextActionModal({
           </motion.div>
         </AnimatePresence>
       </Modal>
-      <ComplaintSlideOver
+      <ComplaintModal
         isOpen={complaintOpen}
         onClose={() => setComplaintOpen(false)}
         caseObject={caseObject}

@@ -9,7 +9,7 @@ import CaseLog from '../components/case/CaseLog.jsx'
 import ManagingPartnerWidget from '../components/case/ManagingPartnerWidget.jsx'
 import CaseBudgetPanel from '../components/case/CaseBudgetPanel.jsx'
 import DeadlinePanel from '../components/case/DeadlinePanel.jsx'
-import ComplaintSlideOver from '../components/case/ComplaintSlideOver.jsx'
+import ComplaintModal from '../components/case/ComplaintModal.jsx'
 
 const TABS = ['Complaint Analysis', 'Litigation Actions', 'Case Log', 'Timeline & Deadlines']
 
@@ -145,7 +145,7 @@ export default function CaseView() {
         </button>
       )}
 
-      <ComplaintSlideOver
+      <ComplaintModal
         isOpen={complaintOpen}
         onClose={() => setComplaintOpen(false)}
         caseObject={caseObject}

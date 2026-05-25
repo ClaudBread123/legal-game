@@ -54,12 +54,22 @@ export const RESOLUTION_PATHS = {
 }
 
 export function determineResolutionPath(caseObject) {
+  // Adversarial engine already pushed the resolution item for MTD grants
+  if (caseObject.mtdGranted) return RESOLUTION_PATHS.dismissal_win
+
   const health = caseObject.caseHealth ?? 100
   const completed = caseObject.completedActions || []
   const prob = caseObject.caseOutcomeProbability ?? { strongWin: 40, settleDefense: 30, settleNeutral: 20, loss: 10 }
 
   const hasMTD = completed.includes('motion_to_dismiss')
   const hasMSJ = completed.includes('motion_summary_judgment')
+
+  // If plaintiff filed MSJ and case health is low, weight heavily toward adverse outcome
+  if (caseObject.plaintiffMSJFiled && health < 40) {
+    const adverseRoll = Math.random()
+    if (adverseRoll < 0.6) return RESOLUTION_PATHS.adverse_outcome
+    return RESOLUTION_PATHS.neutral_settlement
+  }
 
   const roll = Math.random() * 100
   const strongThreshold = prob.strongWin || 40
@@ -79,6 +89,8 @@ export function determineResolutionPath(caseObject) {
 export function shouldTriggerResolution(caseObject, currentDate) {
   if (caseObject.status === 'closed') return false
   if (caseObject.resolutionTriggered) return false
+  // MTD granted resolution is handled by adversarial engine directly
+  if (caseObject.mtdGranted) return false
 
   const health = caseObject.caseHealth ?? 100
   const completed = caseObject.completedActions || []

@@ -1,5 +1,6 @@
 import { callClaude } from './anthropicProxy.js'
 import { getNextFallbackCase } from '../data/fallbackCases.js'
+import { assignOpposingAttorney } from '../data/opposingAttorneys.js'
 
 // Module-level debug logger — set externally for on-screen diagnostics
 let _debugLog = null
@@ -330,6 +331,9 @@ export async function generateCase({
         log('⚠ Health assessment skipped')
       }
 
+      if (!caseObject.opposingAttorney) {
+        caseObject.opposingAttorney = assignOpposingAttorney(caseObject.caseType)
+      }
       log('✓ Using AI case: ' + caseObject.defendant)
       console.log('Case accepted:', caseObject.defendant)
       return caseObject
@@ -347,6 +351,9 @@ export async function generateCase({
   const fallbackHealth = assessOfflineHealth(fallback)
   fallback.caseHealth = fallbackHealth
   fallback.initialCaseHealth = fallbackHealth
+  if (!fallback.opposingAttorney) {
+    fallback.opposingAttorney = assignOpposingAttorney(fallback.caseType)
+  }
   log('✗ Using fallback: ' + fallback.defendant)
   return fallback
 }

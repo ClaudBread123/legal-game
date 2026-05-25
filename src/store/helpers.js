@@ -202,6 +202,7 @@ export const defaultState = {
   apiStatus: 'unknown',
   emails: [],
   generatedEmailEvents: [],
+  pendingEmails: [],
   staleGameCleared: false,
   toasts: [],
   pendingCaseGeneration: null,

@@ -9,7 +9,6 @@ function addDaysISO(isoDate, n) {
 }
 
 const JUDGES = ['Hon. Patricia Morales', 'Hon. David Chen', 'Hon. Sandra Williams']
-const OPPOSING_COUNSEL = 'James R. Thornton, Esq.'
 
 function randomJudge() {
   return JUDGES[Math.floor(Math.random() * JUDGES.length)]
@@ -77,7 +76,8 @@ export function checkAndGenerateEmails(state) {
           emails.push({
             key: oppKey,
             email: makeEmail(EMAIL_TEMPLATES.opposing_sets_hearing, {
-              opposingCounsel: OPPOSING_COUNSEL,
+              opposingCounsel: c.opposingAttorney?.name || "Plaintiff's Counsel",
+              opposingEmail: c.opposingAttorney?.email || 'counsel@plaintifflaw.com',
               caseId: c.caseId,
               hearingDate: addCalendarDays(currentDate, 21),
               judgeName: randomJudge(),
@@ -102,6 +102,9 @@ export function checkAndGenerateEmails(state) {
       const oppKey = `opposing_notices_client_depo_${c.caseId}`
       if (daysSinceFiling >= 45 && !alreadyFired(oppKey)) {
         const depoDate = addCalendarDays(currentDate, 14)
+        const oppName = c.opposingAttorney?.name || "Plaintiff's Counsel"
+        const oppEmail = c.opposingAttorney?.email || 'counsel@plaintifflaw.com'
+        const oppSig = c.opposingAttorney?.signatureStyle || "Plaintiff's Counsel"
         emails.push({
           key: oppKey,
           caseId: c.caseId,
@@ -111,8 +114,8 @@ export function checkAndGenerateEmails(state) {
             read: false,
             responded: false,
             caseId: c.caseId,
-            from: OPPOSING_COUNSEL,
-            fromEmail: 'counsel@plaintifflaw.com',
+            from: oppName,
+            fromEmail: oppEmail,
             subject: `Notice of Taking Deposition — ${c.caseId}`,
             priority: 'urgent',
             body: `Counsel,
@@ -121,8 +124,7 @@ Please be advised that Plaintiff will take the deposition of Risk Manager, ${c.d
 
 Please confirm the witness's availability or contact us immediately to arrange an alternative date.
 
-${OPPOSING_COUNSEL}
-Plaintiff's Counsel`,
+${oppSig}`,
             requiresResponse: true,
             responseDeadlineGameDays: 3,
             responseOptions: [
@@ -184,6 +186,9 @@ Plaintiff's Counsel`,
     const discoveryKey = `opposing_discovery_${c.caseId}`
     if (daysSinceFiling >= 25 && !alreadyFired(discoveryKey)) {
       const rfaDeadline = addDaysISO(currentDate, 30)
+      const oppName2 = c.opposingAttorney?.name || "Plaintiff's Counsel"
+      const oppEmail2 = c.opposingAttorney?.email || 'counsel@plaintifflaw.com'
+      const oppSig2 = c.opposingAttorney?.signatureStyle || "Plaintiff's Counsel"
       emails.push({
         key: discoveryKey,
         caseId: c.caseId,
@@ -194,8 +199,8 @@ Plaintiff's Counsel`,
           read: false,
           responded: false,
           caseId: c.caseId,
-          from: OPPOSING_COUNSEL,
-          fromEmail: 'counsel@plaintifflaw.com',
+          from: oppName2,
+          fromEmail: oppEmail2,
           subject: `Notice of Service of Discovery — ${c.caseId}`,
           priority: 'urgent',
           body: `Counsel,
@@ -206,8 +211,7 @@ Pursuant to the Florida Rules of Civil Procedure, your responses are due within 
 
 Please govern yourself accordingly.
 
-${OPPOSING_COUNSEL}
-Plaintiff's Counsel`,
+${oppSig2}`,
         },
       })
     }
@@ -215,6 +219,9 @@ Plaintiff's Counsel`,
     // ── 6. Motion to compel if discovery unanswered past deadline ──
     const mtcKey = `opposing_mtc_${c.caseId}`
     if (c.rfaDeadline && currentDate > c.rfaDeadline && !completed.includes('respond_to_discovery') && !alreadyFired(mtcKey)) {
+      const oppName3 = c.opposingAttorney?.name || "Plaintiff's Counsel"
+      const oppEmail3 = c.opposingAttorney?.email || 'counsel@plaintifflaw.com'
+      const oppSig3 = c.opposingAttorney?.signatureStyle || "Plaintiff's Counsel"
       emails.push({
         key: mtcKey,
         caseId: c.caseId,
@@ -224,8 +231,8 @@ Plaintiff's Counsel`,
           read: false,
           responded: false,
           caseId: c.caseId,
-          from: OPPOSING_COUNSEL,
-          fromEmail: 'counsel@plaintifflaw.com',
+          from: oppName3,
+          fromEmail: oppEmail3,
           subject: `Motion to Compel Discovery Responses — ${c.caseId}`,
           priority: 'urgent',
           body: `Counsel,
@@ -236,8 +243,7 @@ Plaintiff is preparing a Motion to Compel and will seek an award of attorneys' f
 
 Please provide complete responses within three (3) business days or we will have no choice but to seek court intervention.
 
-${OPPOSING_COUNSEL}
-Plaintiff's Counsel`,
+${oppSig3}`,
         },
       })
     }
@@ -249,6 +255,9 @@ Plaintiff's Counsel`,
         const daysSinceMSJ = daysBetween(msjDate, currentDate)
         const oppMsjKey = `opposing_opp_msj_${c.caseId}`
         if (daysSinceMSJ >= 14 && !alreadyFired(oppMsjKey)) {
+          const oppName4 = c.opposingAttorney?.name || "Plaintiff's Counsel"
+          const oppEmail4 = c.opposingAttorney?.email || 'counsel@plaintifflaw.com'
+          const oppSig4 = c.opposingAttorney?.signatureStyle || "Plaintiff's Counsel"
           emails.push({
             key: oppMsjKey,
             caseId: c.caseId,
@@ -258,8 +267,8 @@ Plaintiff's Counsel`,
               read: false,
               responded: false,
               caseId: c.caseId,
-              from: OPPOSING_COUNSEL,
-              fromEmail: 'counsel@plaintifflaw.com',
+              from: oppName4,
+              fromEmail: oppEmail4,
               subject: `Opposition to Motion for Summary Judgment — ${c.caseId}`,
               priority: 'high',
               body: `Counsel,
@@ -268,8 +277,7 @@ Plaintiff has filed an Opposition to Defendant's Motion for Summary Judgment in 
 
 Please review and advise whether a reply memorandum will be filed.
 
-${OPPOSING_COUNSEL}
-Plaintiff's Counsel`,
+${oppSig4}`,
             },
           })
         }
@@ -279,6 +287,9 @@ Plaintiff's Counsel`,
     // ── 8. Mediation demand at day 90 ──
     const medKey = `mediation_demand_${c.caseId}`
     if (daysSinceFiling >= 90 && !alreadyFired(medKey)) {
+      const oppName5 = c.opposingAttorney?.name || "Plaintiff's Counsel"
+      const oppEmail5 = c.opposingAttorney?.email || 'counsel@plaintifflaw.com'
+      const oppSig5 = c.opposingAttorney?.signatureStyle || "Plaintiff's Counsel"
       emails.push({
         key: medKey,
         caseId: c.caseId,
@@ -288,8 +299,8 @@ Plaintiff's Counsel`,
           read: false,
           responded: false,
           caseId: c.caseId,
-          from: OPPOSING_COUNSEL,
-          fromEmail: 'counsel@plaintifflaw.com',
+          from: oppName5,
+          fromEmail: oppEmail5,
           subject: `Demand for Mediation — ${c.caseId}`,
           priority: 'high',
           body: `Counsel,
@@ -298,8 +309,7 @@ Pursuant to Florida Rule of Civil Procedure 1.700 and the applicable Local Rules
 
 Please advise on your client's availability for mediation within the next 60 days and your preferred mediator.
 
-${OPPOSING_COUNSEL}
-Plaintiff's Counsel`,
+${oppSig5}`,
           requiresResponse: true,
           responseDeadlineGameDays: 5,
           responseOptions: [

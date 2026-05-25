@@ -36,8 +36,8 @@ Set the hearing today. Request a date at least 3 weeks out and no less than 30 m
   }),
 
   opposing_sets_hearing: ctx => ({
-    from: ctx.opposingCounsel,
-    fromEmail: 'counsel@plaintifflaw.com',
+    from: ctx.opposingCounsel || "Plaintiff's Counsel",
+    fromEmail: ctx.opposingEmail || 'counsel@plaintifflaw.com',
     subject: `Re: ${ctx.caseId} — Motion to Dismiss Hearing`,
     body: `Counsel,
 
@@ -45,9 +45,7 @@ Please be advised that I have set the above-referenced Motion to Dismiss for a 5
 
 Please confirm your availability.
 
-Regards,
-${ctx.opposingCounsel}
-Plaintiff's Counsel`,
+${ctx.opposingCounsel || "Plaintiff's Counsel"}`,
     priority: 'urgent',
     requiresResponse: true,
     responseDeadlineGameDays: 2,

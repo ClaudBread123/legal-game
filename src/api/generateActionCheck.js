@@ -62,9 +62,56 @@ Return JSON:
   }
 }
 
+function genericFallbackCheck(caseObject) {
+  return {
+    actionContext: `This action is a standard step in Florida governmental defense litigation for ${caseObject.defendant}.`,
+    keyStatutes: ['§768.28', '§768.28(9)', '§768.28(6)'],
+    questions: [
+      {
+        id: 'q1',
+        type: 'multiple_choice',
+        question: `Which statute governs the waiver of sovereign immunity for ${caseObject.defendant}?`,
+        options: {
+          A: '§768.28 — Florida sovereign immunity and governmental liability',
+          B: '§95.11 — Statute of limitations for civil actions',
+          C: '§57.105 — Attorney fees for frivolous claims',
+          D: '§768.81 — Comparative fault in negligence actions',
+        },
+        correctAnswer: 'A',
+        explanation: '§768.28 is the Florida statute that waives sovereign immunity for tort claims against governmental entities while preserving immunity for individual employees absent bad faith or malice.',
+        statute: '§768.28',
+        xpValue: 25,
+      },
+      {
+        id: 'q2',
+        type: 'multiple_choice',
+        question: `Under §768.28(9), when is an individual government employee personally immune from suit?`,
+        options: {
+          A: 'Always — individual employees can never be personally liable',
+          B: 'When acting within scope of employment, absent bad faith or malicious purpose',
+          C: 'Only when the employing entity has been dismissed from the suit',
+          D: 'When the employee has fewer than five years of service',
+        },
+        correctAnswer: 'B',
+        explanation: '§768.28(9) grants individual immunity to government employees acting within the scope of their employment unless they acted in bad faith, with malicious purpose, or in a manner exhibiting wanton and willful disregard of human rights.',
+        statute: '§768.28(9)',
+        xpValue: 25,
+      },
+    ],
+    qualityRubric: {
+      excellent: 'Identifies all immunity arguments and procedural deadlines applicable to this case',
+      adequate: 'Identifies the primary immunity statute and files timely',
+      deficient: 'Misses threshold immunity arguments or procedural deadlines',
+    },
+  }
+}
+
 function getFallbackCheck(actionId, caseObject, difficulty) {
   const fallbacks = FALLBACK_CHECKS[actionId]
-  if (!fallbacks) return null
+  if (!fallbacks) {
+    console.log('[generateActionCheck] No fallback for actionId:', actionId, '— using generic')
+    return genericFallbackCheck(caseObject)
+  }
   const tier = fallbacks[Math.min(difficulty - 1, fallbacks.length - 1)]
   return {
     ...tier,

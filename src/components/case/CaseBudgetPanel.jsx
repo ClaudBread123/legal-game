@@ -171,6 +171,39 @@ export default function CaseBudgetPanel({ caseObject }) {
         </div>
       )}
 
+      {/* Opposing Counsel */}
+      {caseObject.opposingAttorney && (
+        <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--border)', marginBottom: '16px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '8px' }}>
+            OPPOSING COUNSEL
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '2px', fontFamily: 'var(--font-sans)' }}>
+            {caseObject.opposingAttorney.name}
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            {caseObject.opposingAttorney.firm}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Aggr: </span>
+            <div style={{ display: 'flex', gap: '2px' }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{
+                  width: '5px', height: '5px', borderRadius: '50%',
+                  background: i < caseObject.opposingAttorney.aggressiveness
+                    ? (caseObject.opposingAttorney.aggressiveness >= 8 ? 'var(--accent-red)'
+                      : caseObject.opposingAttorney.aggressiveness >= 6 ? 'var(--accent-yellow)'
+                      : '#4ade80')
+                    : 'var(--border)',
+                }} />
+              ))}
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--text-muted)' }}>
+              {caseObject.opposingAttorney.aggressiveness}/10
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Phase progress dots */}
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: '8px' }}>
         PHASES
