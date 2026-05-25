@@ -7,12 +7,11 @@ import { setDebugLogger } from '../api/caseGenerator.js'
 
 // ── Case generation loading screen ──────────────────────
 const LOADING_PHASES = [
-  { at: 0,    message: 'Reviewing your assignment...' },
-  { at: 4000, message: 'Analyzing Florida statutes...' },
-  { at: 12000, message: 'Preparing case file...' },
-  { at: 22000, message: 'Reviewing jurisdiction and threshold issues...' },
-  { at: 38000, message: 'Validating legal framework...' },
-  { at: 52000, message: 'This is taking a moment — complex matter incoming...' },
+  { at: 0,     message: 'Reviewing your case assignment...' },
+  { at: 6000,  message: 'Preparing case file...' },
+  { at: 14000, message: 'Analyzing the complaint...' },
+  { at: 25000, message: 'Almost ready...' },
+  { at: 35000, message: 'Any moment now...' },
 ]
 
 function CaseLoadingScreen({ debugLog = [] }) {
@@ -28,7 +27,7 @@ function CaseLoadingScreen({ debugLog = [] }) {
 
   useEffect(() => {
     const start = Date.now()
-    const duration = 62000
+    const duration = 45000
     const interval = setInterval(() => {
       const elapsed = Date.now() - start
       setProgress(Math.min(92, Math.round((elapsed / duration) * 92)))
@@ -92,7 +91,7 @@ function CaseLoadingScreen({ debugLog = [] }) {
           {progress}%
         </div>
 
-        {debugLog.length > 0 && (
+        {import.meta.env.DEV && debugLog.length > 0 && (
           <div style={{
             marginTop: '24px',
             background: '#0f1117',
