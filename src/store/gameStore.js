@@ -226,6 +226,8 @@ export const useGameStore = create((set, get) => ({
   ...initialState,
 
   async initGame(playerName) {
+    console.log('=== initGame START ===', playerName)
+    console.log('Proxy URL configured:', !!import.meta.env.VITE_API_PROXY_URL)
     const startDate = getSimulatedStartDate()
     const welcomeEmails = buildWelcomeEmails(playerName, startDate)
 
@@ -262,7 +264,9 @@ export const useGameStore = create((set, get) => ({
     }
 
     // Step 3: Generate Case 1 — AWAIT fully before doing anything else
+    console.log('=== Starting case generation ===')
     let case1
+    let case1IsFallback = false
     try {
       console.log('initGame: generating Case 1 via API')
       const rawCase1 = await generateCase({
@@ -309,11 +313,12 @@ You MUST generate a state tort case involving a Florida city or county municipal
         estimatedHours: 40 + Math.floor(Math.random() * 20),
         status: 'active',
       })
-      console.log('initGame: Case 1 generated successfully', case1.caseId)
+      console.log('=== Case 1 generated ===', 'caseId:', case1.caseId, '| Is fallback:', false)
     } catch (err) {
       console.error('initGame: Case 1 generation failed', err?.message)
       case1 = makeCaseObject(getNextFallbackCase([]))
-      console.log('initGame: using fallback', case1.caseId)
+      case1IsFallback = true
+      console.log('=== Case 1 generated ===', 'caseId:', case1.caseId, '| Is fallback:', true)
     }
 
     const case1Email = buildCaseAssignedEmail(case1, playerName, startDate)

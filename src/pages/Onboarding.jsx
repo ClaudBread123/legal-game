@@ -5,25 +5,35 @@ import FirmLogo from '../components/shared/FirmLogo.jsx'
 import { formatGameDate } from '../utils/dateUtils.js'
 
 // ── Case generation loading screen ──────────────────────
+const LOADING_PHASES = [
+  { at: 0,    message: 'Reviewing your assignment...' },
+  { at: 4000, message: 'Analyzing Florida statutes...' },
+  { at: 12000, message: 'Preparing case file...' },
+  { at: 22000, message: 'Reviewing jurisdiction and threshold issues...' },
+  { at: 38000, message: 'Validating legal framework...' },
+  { at: 52000, message: 'This is taking a moment — complex matter incoming...' },
+]
+
 function CaseLoadingScreen() {
-  const [phase, setPhase] = useState(0)
-  const [dots, setDots] = useState('.')
+  const [phaseIndex, setPhaseIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 500)
-    const t2 = setTimeout(() => setPhase(2), 3000)
-    const t3 = setTimeout(() => setPhase(3), 8000)
-    const t4 = setTimeout(() => setPhase(4), 15000)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4) }
+    const timers = LOADING_PHASES.slice(1).map((p, i) =>
+      setTimeout(() => setPhaseIndex(i + 1), p.at)
+    )
+    return () => timers.forEach(clearTimeout)
   }, [])
 
   useEffect(() => {
-    if (phase < 1) return
+    const start = Date.now()
+    const duration = 62000
     const interval = setInterval(() => {
-      setDots(d => d.length >= 3 ? '.' : d + '.')
-    }, 500)
+      const elapsed = Date.now() - start
+      setProgress(Math.min(92, Math.round((elapsed / duration) * 92)))
+    }, 250)
     return () => clearInterval(interval)
-  }, [phase])
+  }, [])
 
   return (
     <div style={{
@@ -39,75 +49,47 @@ function CaseLoadingScreen() {
       >
         <FirmLogo size="lg" />
 
-        <AnimatePresence>
-          {phase >= 1 && (
+        <div style={{ marginTop: '32px', minHeight: '52px' }}>
+          <AnimatePresence mode="wait">
             <motion.div
-              key="reviewing"
-              initial={{ opacity: 0, y: 8 }}
+              key={phaseIndex}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              style={{
-                marginTop: '32px',
-                fontSize: '16px', color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-              }}
-            >
-              Reviewing your assignment{dots}
-            </motion.div>
-          )}
-
-          {phase >= 2 && (
-            <motion.div
-              key="preparing"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              style={{
-                marginTop: '20px',
-                padding: '12px 20px',
-                background: 'rgba(201,168,76,0.08)',
-                border: '1px solid var(--accent-gold)44',
-                borderRadius: '6px',
-                fontSize: '13px', color: 'var(--accent-gold)',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              Preparing case file{dots}
-            </motion.div>
-          )}
-
-          {phase >= 3 && (
-            <motion.div
-              key="almost"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              style={{
-                marginTop: '12px',
-                fontSize: '13px', color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-              }}
-            >
-              Almost ready{dots}
-            </motion.div>
-          )}
-
-          {phase >= 4 && (
-            <motion.div
-              key="slow"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.4 }}
               style={{
-                marginTop: '16px',
-                fontSize: '12px', color: 'var(--text-muted)',
-                fontFamily: 'var(--font-mono)',
+                fontSize: phaseIndex === 0 ? '16px' : '14px',
+                color: phaseIndex === 0 ? 'var(--text-secondary)' : 'var(--accent-gold)',
+                fontFamily: phaseIndex === 0 ? 'var(--font-serif)' : 'var(--font-mono)',
+                fontStyle: phaseIndex === 0 ? 'italic' : 'normal',
               }}
             >
-              This is taking a moment — complex matter incoming...
+              {LOADING_PHASES[phaseIndex].message}
             </motion.div>
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
+
+        <div style={{
+          marginTop: '28px',
+          width: '100%', height: '3px',
+          background: 'var(--bg-secondary)',
+          borderRadius: '2px', overflow: 'hidden',
+        }}>
+          <div style={{
+            height: '100%', borderRadius: '2px',
+            background: 'var(--accent-gold)',
+            width: `${progress}%`,
+            transition: 'width 250ms linear',
+          }} />
+        </div>
+
+        <div style={{
+          marginTop: '8px',
+          fontSize: '11px', color: 'var(--text-muted)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {progress}%
+        </div>
       </motion.div>
     </div>
   )

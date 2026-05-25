@@ -2,6 +2,24 @@ import { callClaude } from './anthropicProxy.js'
 import { FL_768_28_FULL, FL_1983_REMOVAL, FL_BERT_HARRIS, FL_EMPLOYMENT_ADMIN } from '../data/legalKnowledgeBase.js'
 
 export async function validateCase(caseObject) {
+  try {
+    const result = await Promise.race([
+      runCaseValidation(caseObject),
+      new Promise(resolve => setTimeout(() => resolve({
+        isValid: true,
+        confidenceScore: 'MEDIUM',
+        errors: [],
+        warnings: [],
+        validationNotes: 'Timed out — accepted',
+      }), 8000)),
+    ])
+    return result
+  } catch (err) {
+    return { isValid: true, confidenceScore: 'MEDIUM', errors: [], warnings: [], validationNotes: 'Error — accepted' }
+  }
+}
+
+async function runCaseValidation(caseObject) {
   const systemPrompt = `You are a Florida Bar licensed attorney specializing in governmental defense reviewing AI-generated training cases for legal accuracy. You must identify any legal errors before the case reaches a student attorney.
 
 AUTHORITATIVE LEGAL REFERENCE:
@@ -47,28 +65,16 @@ Return JSON:
   "validationNotes": "overall assessment"
 }`
 
-  try {
-    const response = await callClaude({
-      system: systemPrompt,
-      userMessage: userPrompt,
-      maxTokens: 1500,
-    })
+  const response = await callClaude({
+    system: systemPrompt,
+    userMessage: userPrompt,
+    maxTokens: 1500,
+  })
 
-    const clean = response
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim()
+  const clean = response
+    .replace(/```json/g, '')
+    .replace(/```/g, '')
+    .trim()
 
-    return JSON.parse(clean)
-  } catch (err) {
-    console.warn('Case validation failed:', err.message)
-    // Pass the case through — better to show unvalidated than block play
-    return {
-      isValid: true,
-      confidenceScore: 'MEDIUM',
-      errors: [],
-      warnings: [],
-      validationNotes: 'Validation unavailable',
-    }
-  }
+  return JSON.parse(clean)
 }

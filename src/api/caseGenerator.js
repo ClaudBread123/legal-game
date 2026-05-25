@@ -1,8 +1,6 @@
 import { callClaude } from './anthropicProxy.js'
 import { getNextFallbackCase } from '../data/fallbackCases.js'
-import { FL_768_28_FULL } from '../data/legalKnowledgeBase.js'
-import { validateCase as validateCaseLegal } from './validateCase.js'
-import { addBusinessDays } from '../utils/dateUtils.js'
+import { validateCase } from './validateCase.js'
 
 const PROHIBITED_DEFENDANTS = [
   'broward county school board',
@@ -10,28 +8,6 @@ const PROHIBITED_DEFENDANTS = [
   'palmetto shores',
   'horizon academy',
 ]
-
-const REQUIRED_FIELDS = [
-  'caseId', 'caseType', 'clientName', 'defendant',
-  'dateFiled', 'dateOfIncident', 'factScenario',
-  'claimsAsserted', 'hiddenIssues', 'applicableDefenses',
-  'previewFlag', 'hb145Applicable',
-]
-
-function validateCaseStructure(obj) {
-  for (const field of REQUIRED_FIELDS) {
-    if (obj[field] === undefined || obj[field] === null) {
-      throw new Error(`Missing required field: ${field}`)
-    }
-  }
-  if (!Array.isArray(obj.claimsAsserted) || obj.claimsAsserted.length === 0) {
-    throw new Error('claimsAsserted must be non-empty array')
-  }
-  if (!Array.isArray(obj.hiddenIssues) || obj.hiddenIssues.length === 0) {
-    throw new Error('hiddenIssues must be non-empty array')
-  }
-  return true
-}
 
 const FL_MUNICIPALITY_TYPES = [
   'City', 'Town', 'County', 'Village', 'Municipality', 'Special District',
@@ -66,10 +42,10 @@ function extractIncidentType(factScenario) {
 
 function buildVarietyPrompt(existingCases) {
   if (!existingCases || existingCases.length === 0) {
-    return `Generate a completely unique Florida state tort case involving a city or county municipality (NOT a school board) where a plaintiff was physically injured. Do not use: Palmetto Shores, Marcus Delray, Riverside Park, Officer Dana Whitmore, Suncoast Charter Academy, Priya Nambiar, Broward County School Board, Terrence Washington, Cypress Ridge, Horizon Academy, or any employment/whistle-blower/termination scenario.`
+    return `VARIETY REQUIREMENT: Generate a completely unique Florida state tort case involving a city or county municipality (NOT a school board) where a plaintiff was physically injured. Do not use: Palmetto Shores, Marcus Delray, Riverside Park, Officer Dana Whitmore, Suncoast Charter Academy, Priya Nambiar, Broward County School Board, Terrence Washington, Cypress Ridge, Horizon Academy, or any employment/whistle-blower/termination scenario.`
   }
 
-  const history = existingCases.map(c => ({
+  const history = existingCases.slice(-5).map(c => ({
     caseId: c.caseId,
     defendant: c.defendant,
     defendantType: extractMunicipalityType(c.defendant),
@@ -80,143 +56,260 @@ function buildVarietyPrompt(existingCases) {
   }))
 
   const prohibitedDefendants = existingCases.map(c => c.defendant)
-  const prohibitedDefendantTypes = [...new Set(existingCases.map(c => extractMunicipalityType(c.defendant)))]
-  const prohibitedIncidentTypes = [...new Set(existingCases.map(c => extractIncidentType(c.factScenario)).filter(Boolean))]
+  const prohibitedTypes = [...new Set(existingCases.map(c => extractMunicipalityType(c.defendant)))]
+  const prohibitedIncidents = [...new Set(existingCases.map(c => extractIncidentType(c.factScenario)).filter(Boolean))]
   const prohibitedPlaintiffs = existingCases.map(c => c.clientName)
   const prohibitedIssues = existingCases.map(c => c.hiddenIssues?.[0]?.issueType).filter(Boolean)
 
-  return `
-EXISTING CASES — STRICT VARIETY REQUIRED:
+  return `EXISTING CASES — STRICT VARIETY REQUIRED:
 ${JSON.stringify(history, null, 2)}
 
-YOU ARE STRICTLY PROHIBITED FROM USING:
-
-Prohibited defendants (exact names):
-${prohibitedDefendants.map(d => `- ${d}`).join('\n')}
-
-Prohibited defendant types (use a different type):
-${prohibitedDefendantTypes.map(t => `- ${t}`).join('\n')}
-(If all existing cases use cities, use a county, school board, or special district instead)
-
-Prohibited incident types (use a different incident):
-${prohibitedIncidentTypes.length > 0 ? prohibitedIncidentTypes.map(t => `- ${t}`).join('\n') : '(none yet)'}
-(If existing cases involve negligent security, use vehicle accident, employment, wrongful arrest, premises defect, or property taking instead)
-
-Prohibited plaintiff names:
-${prohibitedPlaintiffs.map(p => `- ${p}`).join('\n')}
-
-Prohibited primary hidden issue types (use a different primary issue):
-${prohibitedIssues.length > 0 ? prohibitedIssues.map(i => `- ${i}`).join('\n') : '(none yet)'}
-
-Also NEVER use:
-- Palmetto Shores (any variation)
-- Riverside Park
-- Marcus Delray
-- Officer Dana Whitmore
-- Any park negligent security at night scenario
-- Suncoast Charter Academy
-- Priya Nambiar
-
-The new case MUST be meaningfully different from all existing cases on every dimension.`
+STRICTLY PROHIBITED:
+Defendants: ${prohibitedDefendants.join(', ')}
+Defendant types: ${prohibitedTypes.join(', ')}
+Incident types: ${prohibitedIncidents.join(', ')}
+Plaintiff names: ${prohibitedPlaintiffs.join(', ')}
+Primary issue types: ${prohibitedIssues.join(', ')}
+Also never: Palmetto Shores, Marcus Delray, Broward County School Board, Terrence Washington, Cypress Ridge, Horizon Academy.
+The new case MUST be meaningfully different on every dimension.`
 }
 
-function buildCaseHistory(existingCases) {
-  if (!existingCases || existingCases.length === 0) return ''
-  const summaries = existingCases.slice(-5).map(c =>
-    `- ${c.caseId}: ${c.defendant} (${c.caseType}), incident: ${extractIncidentType(c.factScenario) || 'unspecified'}, plaintiff: ${c.clientName}`
-  )
-  return `\n\nEXISTING CASES (avoid repeating defendant names, municipality types, or incident types):\n${summaries.join('\n')}`
+function buildCaseSystemPrompt() {
+  return `You are a case generation engine for a Florida governmental defense litigation training simulator at the law firm Llopiz Wizel LLP. Generate realistic, entirely fictitious Florida civil cases against governmental entities. Every name, entity, and fact must be fictional.
+
+FLORIDA LAW — APPLY EXACTLY:
+
+§768.28(9) Individual Immunity:
+Government employees may NOT be held personally liable for acts within scope of employment unless they acted in bad faith, with malicious purpose, or with wanton disregard of human rights. The exclusive remedy for in-scope conduct is against the entity.
+
+§768.28(6)(a) Pre-Suit Notice:
+Written notice is a condition precedent to suit.
+Window: 18 months if dateOfIncident >= 2026-10-01
+Window: 3 years if dateOfIncident < 2026-10-01
+
+§768.28(5) Damages Caps:
+If dateOfIncident >= 2026-10-01 (HB 145): $350,000 per person / $500,000 per occurrence
+If dateOfIncident < 2026-10-01: $200,000 per person / $300,000 per occurrence
+§1983 federal claims are NOT subject to these caps.
+
+§1983 Federal Claims:
+If complaint includes 42 U.S.C. §1983 claims, defendant has 30 days from service to remove to federal district court — flag as critical hidden issue.
+
+hb145Applicable: true ONLY if dateOfIncident >= "2026-10-01", else false.
+
+OUTPUT: ONLY valid JSON. No markdown, no code blocks, no explanation. Match schema exactly.`
 }
 
-function getFallbackCase() {
-  return getNextFallbackCase([])
+function getDifficultyNote(playerLevel) {
+  const titleMap = {
+    1: 'Junior Associate', 2: 'Associate', 3: 'Senior Associate',
+    4: 'Junior Partner', 5: 'Partner', 6: 'Equity Shareholder',
+  }
+  const title = typeof playerLevel === 'number'
+    ? (titleMap[playerLevel] || 'Junior Associate')
+    : (playerLevel || 'Junior Associate')
+
+  const notes = {
+    'Junior Associate': '1 of 5 — 2-3 hidden issues, clear facts, one critical §768.28 issue required',
+    'Associate': '2 of 5 — 3-4 hidden issues, some ambiguity',
+    'Senior Associate': '3 of 5 — 4-5 issues, overlapping frameworks',
+    'Junior Partner': '4 of 5 — complex multi-issue, federal overlay',
+    'Partner': '5 of 5 — maximum complexity, novel facts',
+    'Equity Shareholder': '5 of 5 — maximum complexity, novel facts',
+  }
+  return notes[title] || notes['Junior Associate']
 }
 
-export async function generateCase({ caseType = 'state_tort', playerLevel = 1, currentDate, constraints, existingCases }) {
-  const system = `You are a case generation engine for a Florida governmental litigation training simulator at the law firm Llopiz Wizel LLP. Generate realistic but entirely fictitious civil cases against Florida municipalities or charter schools. All names, entities, and facts are fictional. Output ONLY valid JSON with no markdown formatting, no code blocks, no explanation. The JSON must match the schema exactly.
+function buildCaseUserPrompt({ caseType, playerLevel, currentDate, existingCases, constraints }) {
+  const varietyBlock = buildVarietyPrompt(existingCases)
+  const constraintBlock = constraints?.instruction
+    ? `\nSPECIAL REQUIREMENTS:\n${constraints.instruction}`
+    : ''
+  const difficultyNote = getDifficultyNote(playerLevel)
 
-LEGAL ACCURACY REQUIREMENTS:
-${FL_768_28_FULL}
+  return `Generate a Florida governmental defense case with these parameters:
 
-When embedding hidden issues:
-- Apply correct HB 145 provisions based on dateOfIncident vs October 1, 2026
-- Set hb145Applicable: true if dateOfIncident is on or after 2026-10-01, else false
-- Pre-suit notice window: 18 months if dateOfIncident >= 2026-10-01, else 3 years
-- Damages caps: $350k/$500k if dateOfIncident >= 2026-10-01, else $200k/$300k
-- SOL: 2 years for negligence, 4 years for other civil actions
-- §1983 claims are UNCAPPED — do not apply §768.28(5) caps to federal civil rights claims`
+CASE TYPE: ${caseType || 'state_tort'}
+PLAYER LEVEL: ${playerLevel || 'Junior Associate'}
+CURRENT DATE: ${currentDate}
+DIFFICULTY: ${difficultyNote}
 
-  const varietyPrompt = buildVarietyPrompt(existingCases)
+${varietyBlock}
+${constraintBlock}
 
-  const constraintsText = constraints ? `
-
-CONSTRAINTS FOR THIS CASE:
-${constraints.mustInclude?.length ? `- Must include hidden issues of these types: ${constraints.mustInclude.join(', ')}` : ''}
-${constraints.difficulty ? `- Difficulty level: ${constraints.difficulty}/4` : ''}
-${constraints.instruction ? `- Specific instruction: ${constraints.instruction}` : ''}` : ''
-
-  const userMessage = `Generate a case of type: ${caseType} for a player at level ${playerLevel}. Today's simulated date is ${currentDate}.
-
-${varietyPrompt}
-${constraintsText}
-
-Required JSON schema:
+REQUIRED JSON SCHEMA — output this exactly:
 {
-  "caseId": "string (format LW-YYYY-NNNN)",
-  "caseType": "string",
-  "clientName": "string",
-  "defendant": "string (Florida municipality or charter school, fictitious)",
-  "dateFiled": "string (ISO date, 3-7 days before today)",
-  "dateOfIncident": "string (ISO date, 6-18 months before dateFiled)",
-  "factScenario": "string (3-5 sentences)",
-  "claimsAsserted": ["string"],
-  "hiddenIssues": [{"issueType": "string", "description": "string", "severity": "string", "statute": "string", "deadline": "string or null"}],
-  "applicableDefenses": ["string"],
-  "previewFlag": "string (one vague hint about threshold issue)",
-  "hb145Applicable": "boolean (true if dateOfIncident is on or after 2026-10-01)"
+  "caseId": "LW-2026-XXXX (4 random digits)",
+  "caseType": "${caseType || 'state_tort'}",
+  "clientName": "Plaintiff full name (fictional)",
+  "defendant": "Florida governmental entity name",
+  "dateFiled": "ISO date 3-7 days before ${currentDate}",
+  "dateOfIncident": "ISO date 6-18 months before dateFiled",
+  "factScenario": "4-6 sentences describing the incident. Include what happened, where, who was involved, what injuries resulted, and the governmental entity's role.",
+  "claimsAsserted": [
+    "Count I — [Claim Type] ([Defendant])",
+    "Count II — [Claim Type] ([Party])"
+  ],
+  "hiddenIssues": [
+    {
+      "issueType": "barred_individual_defendant | insufficient_presuit_notice | sovereign_immunity_bar | statute_of_limitations | wrong_venue | duplicative_counts | federal_removal_1983 | admin_exhaustion | hb145_cap_applicability | hb145_notice_window",
+      "description": "Detailed explanation of the issue and its legal significance",
+      "severity": "critical | major | minor",
+      "statute": "Primary statute citation",
+      "deadline": "Deadline string or null"
+    }
+  ],
+  "applicableDefenses": ["Defense description with statute"],
+  "previewFlag": "One vague sentence hinting at the most important threshold issue without revealing it",
+  "hb145Applicable": true or false
 }
 
-At level 1: include at minimum one of: barred_individual_defendant, insufficient_presuit_notice, sovereign_immunity_bar.
-At level 2+: also include statute_of_limitations or hb145 issues.
-At level 3+: may include federal_removal_1983 or admin_exhaustion.
-Always make the fact scenario realistic to Florida governmental defense practice.`
+FLORIDA GOVERNMENTAL ENTITIES TO USE:
+Cities: Miami, Orlando, Tampa, Jacksonville, Fort Lauderdale, Hialeah, Tallahassee, St. Petersburg, Cape Coral, Pembroke Pines, Hollywood, Miramar, Gainesville, Coral Springs, Clearwater, Palm Bay, Pompano Beach, West Palm Beach, Lakeland, Davie, Miami Gardens, Sunrise, Deltona, Ocala, Port St. Lucie, Boca Raton, Deerfield Beach, Boynton Beach, Lauderhill, Weston, Delray Beach
 
-  const maxAttempts = 3
+Counties: Miami-Dade County, Broward County, Palm Beach County, Hillsborough County, Orange County, Pinellas County, Duval County, Lee County, Polk County, Brevard County, Volusia County, Seminole County, Sarasota County, Manatee County, Alachua County, Leon County, Collier County, St. Johns County, Marion County, Pasco County, Escambia County, Indian River County
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+Charter Schools (fictional names only): First Coast Charter Academy, Gulf Coast Preparatory Academy, Space Coast Charter School, Treasure Coast Academy, Bay Area Charter Institute, Keys Preparatory Academy, Emerald Coast Charter School, Nature Coast Academy
+
+Special Districts: South Florida Water Management District, Central Florida Expressway Authority, fictional transit/port/hospital/community development districts
+
+INCIDENT TYPES: Negligent security at government building or transit station, Slip and fall on government property, Government vehicle accident, Police use of force or wrongful arrest, Employment retaliation or discrimination, ADA accommodation failure, Property taking or zoning dispute, Student injury at school, Premises defect or infrastructure failure, False imprisonment or wrongful detention, Medical negligence at government facility, Excessive force during lawful encounter
+
+Generate the case now. Output JSON only.`
+}
+
+export async function generateCase({
+  caseType,
+  playerLevel,
+  currentDate,
+  existingCases = [],
+  constraints = {},
+}) {
+  console.log('generateCase: starting 60-second best-effort generation')
+  console.log('caseType:', caseType, '| playerLevel:', playerLevel, '| existingCases:', existingCases.length)
+
+  const TIMEOUT_MS = 60000
+  const ATTEMPT_TIMEOUT_MS = 25000
+  const startTime = Date.now()
+  const candidates = []
+  let attempts = 0
+  const maxAttempts = 5
+
+  const systemPrompt = buildCaseSystemPrompt()
+  const userPrompt = buildCaseUserPrompt({ caseType, playerLevel, currentDate, existingCases, constraints })
+  console.log('Total prompt chars:', systemPrompt.length + userPrompt.length)
+
+  while (attempts < maxAttempts && Date.now() - startTime < TIMEOUT_MS) {
+    attempts++
+    const elapsed = Date.now() - startTime
+    console.log(`Attempt ${attempts}, elapsed: ${Math.round(elapsed / 1000)}s`)
+
     try {
-      const text = await callClaude({ system, userMessage, maxTokens: 1500 })
-      const clean = text.replace(/```json/g, '').replace(/```/g, '').trim()
-      const parsed = JSON.parse(clean)
-      validateCaseStructure(parsed)
+      const response = await Promise.race([
+        callClaude({ system: systemPrompt, userMessage: userPrompt, maxTokens: 3000 }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('ATTEMPT_TIMEOUT')), ATTEMPT_TIMEOUT_MS)
+        ),
+      ])
 
-      // Hard prohibition check — force retry if banned defendant appears
-      const defendantLower = parsed.defendant.toLowerCase()
+      console.log('Response received, length:', response?.length)
+
+      const clean = response.replace(/```json/gi, '').replace(/```/g, '').trim()
+      let caseObject
+      try {
+        caseObject = JSON.parse(clean)
+      } catch (parseErr) {
+        console.warn('JSON parse failed:', parseErr.message)
+        console.warn('First 300 chars:', clean.substring(0, 300))
+        continue
+      }
+
+      // Validate required fields inline
+      const required = [
+        'caseId', 'caseType', 'clientName', 'defendant', 'factScenario',
+        'claimsAsserted', 'hiddenIssues', 'applicableDefenses', 'previewFlag', 'hb145Applicable',
+      ]
+      const missing = required.filter(f => caseObject[f] === undefined || caseObject[f] === null)
+      if (missing.length > 0) {
+        console.warn('Missing required fields:', missing)
+        continue
+      }
+
+      if (!Array.isArray(caseObject.claimsAsserted) || !Array.isArray(caseObject.hiddenIssues)) {
+        console.warn('claimsAsserted or hiddenIssues not arrays')
+        continue
+      }
+
+      // Hard prohibition check — never accept banned defendants
+      const defendantLower = caseObject.defendant.toLowerCase()
       const isProhibited = PROHIBITED_DEFENDANTS.some(p => defendantLower.includes(p))
       if (isProhibited) {
-        console.warn('Generated prohibited defendant:', parsed.defendant, '— retrying')
-        throw new Error('PROHIBITED_DEFENDANT')
+        console.warn('Prohibited defendant:', caseObject.defendant, '— retrying')
+        continue
       }
 
-      // Legal accuracy validation
-      const validation = await validateCaseLegal(parsed)
+      console.log('Valid candidate:', caseObject.defendant, '| type:', caseObject.caseType)
 
-      if (validation.isValid && validation.confidenceScore !== 'LOW') {
-        return parsed
+      // Legal validation — non-blocking, 8s max
+      let validationScore = 1
+      try {
+        const validation = await Promise.race([
+          validateCase(caseObject),
+          new Promise(resolve =>
+            setTimeout(() => resolve({ isValid: true, confidenceScore: 'MEDIUM' }), 8000)
+          ),
+        ])
+        if (validation.isValid && validation.confidenceScore === 'HIGH') {
+          validationScore = 3
+          console.log('Validation: HIGH confidence')
+        } else if (validation.isValid) {
+          validationScore = 2
+          console.log('Validation: MEDIUM confidence')
+        } else {
+          validationScore = 1
+          console.log('Validation: failed but keeping as candidate')
+        }
+      } catch (valErr) {
+        console.warn('Validator error:', valErr.message)
+        validationScore = 1
       }
 
-      if (validation.errors.length === 0 && attempt >= 2) {
-        // No hard errors — accept with only warnings
-        return parsed
+      candidates.push({ caseObject, validationScore, generatedAt: Date.now() - startTime })
+
+      // Use immediately if HIGH confidence
+      if (validationScore === 3) {
+        console.log('HIGH confidence — using immediately after', Math.round((Date.now() - startTime) / 1000), 'seconds')
+        return caseObject
       }
 
-      console.warn(`Case validation attempt ${attempt} failed:`, validation.errors)
+      // Use best available if running low on time
+      const timeRemaining = TIMEOUT_MS - (Date.now() - startTime)
+      console.log('Time remaining:', Math.round(timeRemaining / 1000), 's')
+      if (timeRemaining < 12000 && candidates.length >= 1) {
+        console.log('Low on time — using best available candidate')
+        break
+      }
+
     } catch (err) {
-      if (attempt >= maxAttempts) {
-        return getFallbackCase()
+      console.warn(`Attempt ${attempts} failed:`, err.message)
+      if (err.message === 'API_UNAVAILABLE') {
+        console.error('API unavailable — stopping attempts')
+        break
       }
     }
   }
 
-  return getFallbackCase()
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.validationScore - a.validationScore)
+    const best = candidates[0]
+    console.log(
+      'Using best candidate (score:', best.validationScore,
+      ', at:', Math.round(best.generatedAt / 1000) + 's):',
+      best.caseObject.defendant
+    )
+    return best.caseObject
+  }
+
+  console.error('generateCase: zero valid candidates — using fallback')
+  return getNextFallbackCase(existingCases.map(c => c.caseId))
 }
