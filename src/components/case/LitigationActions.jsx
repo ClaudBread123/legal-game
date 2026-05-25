@@ -6,7 +6,9 @@ import ExpertPanel from './ExpertPanel.jsx'
 import InvestigationResults from './InvestigationResults.jsx'
 import PublicRecordsRequest from './PublicRecordsRequest.jsx'
 import StatusUpdateModal from './StatusUpdateModal.jsx'
+import ActionComprehensionModal from './ActionComprehensionModal.jsx'
 import Modal from '../shared/Modal.jsx'
+import { generateActionCheck } from '../../api/generateActionCheck.js'
 
 const EXPERT_WIZARD_ACTION_IDS = new Set(['identify_expert', 'select_expert', 'retain_expert'])
 
@@ -16,6 +18,18 @@ const SPECIAL_MODAL_TYPES = {
   public_records_request: 'public_records',
   status_update_client: 'status_update',
 }
+
+const CHECK_REQUIRED_ACTIONS = new Set([
+  'check_presuit_notice',
+  'check_statute_of_limitations',
+  'motion_to_dismiss',
+  'written_discovery',
+  'notice_plaintiff_depo',
+  'take_plaintiff_depo',
+  'initial_evaluation',
+  'motion_summary_judgment',
+  'respond_to_discovery',
+])
 
 function isPhaseUnlocked(phase, completedActions) {
   if (phase.id === 'phase_1') return true
@@ -43,11 +57,17 @@ function getPrereqLabel(action) {
 }
 
 export default function LitigationActions({ caseObject }) {
-  const { dailyActionsRemaining, completeAction, billTime, spendAction, addXP, logActivity } = useGameStore()
+  const { dailyActionsRemaining, completeAction, billTime, spendAction, addXP, logActivity, addEmail, player } = useGameStore()
   const [selectedPhaseId, setSelectedPhaseId] = useState('phase_1')
   const [modalAction, setModalAction] = useState(null)
   const [specialModal, setSpecialModal] = useState(null)
   const [celebrateId, setCelebrateId] = useState(null)
+  const [checkModal, setCheckModal] = useState({
+    isOpen: false,
+    action: null,
+    checkData: null,
+    isLoading: false,
+  })
 
   const completed = caseObject.completedActions || []
   const timestamps = caseObject.actionTimestamps || {}
@@ -67,6 +87,65 @@ export default function LitigationActions({ caseObject }) {
     spendAction(action.dailyActionCost)
     addXP(action.xpReward, `${action.label} on ${caseObject.caseId}`)
     logActivity(`Action taken: ${action.label} (${caseObject.caseId})`, 'action')
+
+    setCelebrateId(action.id)
+    setTimeout(() => setCelebrateId(null), 1500)
+  }
+
+  const openComprehensionCheck = async (action) => {
+    // Open modal in loading state immediately
+    setCheckModal({ isOpen: true, action, checkData: null, isLoading: true })
+
+    try {
+      const checkData = await generateActionCheck({
+        caseObject,
+        actionId: action.id,
+        playerLevel: player?.title || 'Junior Associate',
+        completedActions: completed,
+        activeConsequences: caseObject.activeConsequences || [],
+      })
+      setCheckModal(prev => ({ ...prev, checkData, isLoading: false }))
+    } catch {
+      // generateActionCheck already returns fallback on error; if it returns null, skip check
+      setCheckModal({ isOpen: false, action: null, checkData: null, isLoading: false })
+      // Fall through to standard confirm modal
+      setModalAction(action)
+    }
+  }
+
+  const handleComprehensionComplete = (qualityScore) => {
+    const action = checkModal.action
+    setCheckModal({ isOpen: false, action: null, checkData: null, isLoading: false })
+    if (!action) return
+
+    completeAction(caseObject.caseId, action.id, qualityScore)
+    billTime(caseObject.caseId, action.hours, action.label)
+    spendAction(action.dailyActionCost)
+
+    const xpMultiplier = qualityScore === 3 ? 1.0 : qualityScore === 2 ? 0.6 : 0.2
+    const earnedXP = Math.round(action.xpReward * xpMultiplier)
+    addXP(earnedXP, `${action.label} — Quality ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
+    logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
+
+    if (qualityScore === 1) {
+      addEmail({
+        from: 'Onier Llopiz',
+        fromEmail: 'o.llopiz@llopizwizel.com',
+        subject: `Case Review Flagged — ${caseObject.caseId}`,
+        priority: 'high',
+        requiresResponse: false,
+        caseId: caseObject.caseId,
+        body: `${player?.name || 'Associate'},
+
+I've been informed that your assessment on "${action.label}" (${caseObject.caseId}) was scored deficient.
+
+This is not a matter of effort — it is a matter of preparation and understanding. Deficient work on a governmental defense matter has real consequences for the client.
+
+Please review the relevant statutes and come prepared to discuss this file.
+
+— OL`,
+      })
+    }
 
     setCelebrateId(action.id)
     setTimeout(() => setCelebrateId(null), 1500)
@@ -336,6 +415,7 @@ export default function LitigationActions({ caseObject }) {
                       onClick={() => {
                         const specialType = SPECIAL_MODAL_TYPES[action.id]
                         if (specialType) setSpecialModal({ action, type: specialType })
+                        else if (CHECK_REQUIRED_ACTIONS.has(action.id)) openComprehensionCheck(action)
                         else setModalAction(action)
                       }}
                       disabled={!canAct}
@@ -408,6 +488,18 @@ export default function LitigationActions({ caseObject }) {
           />
         )}
       </Modal>
+
+      {/* Comprehension check modal */}
+      <ActionComprehensionModal
+        isOpen={checkModal.isOpen}
+        onClose={() => setCheckModal({ isOpen: false, action: null, checkData: null, isLoading: false })}
+        onComplete={handleComprehensionComplete}
+        action={checkModal.action}
+        caseObject={caseObject}
+        playerTitle={player?.title || 'Junior Associate'}
+        isLoading={checkModal.isLoading}
+        checkData={checkModal.checkData}
+      />
 
       {/* Confirm modal */}
       <Modal isOpen={!!modalAction} onClose={() => setModalAction(null)} title={modalAction?.label}>

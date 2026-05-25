@@ -589,7 +589,7 @@ Timely responses to opposing counsel and court notices are not optional. This ha
     persist({ ...state, ...updated })
   },
 
-  completeAction(caseId, actionId) {
+  completeAction(caseId, actionId, qualityScore = 3) {
     const state = get()
     const caseObj = state.cases.find(c => c.caseId === caseId)
     if (!caseObj) return
@@ -610,6 +610,16 @@ Timely responses to opposing counsel and court notices are not optional. This ha
     }
     const promo = buildPromotionUpdate(updatedPlayer, state.currentDate, state)
 
+    // Quality-based case health adjustment
+    const healthDelta = qualityScore === 3 ? 2 : qualityScore === 2 ? 0 : -5
+    const healthEvent = healthDelta !== 0 ? {
+      date: state.currentDate,
+      event: `${actionId} — ${qualityScore === 3 ? 'Excellent' : qualityScore === 1 ? 'Deficient' : 'Adequate'} work`,
+      impact: healthDelta,
+      description: 'Action quality assessment',
+      type: healthDelta > 0 ? 'positive' : 'consequence',
+    } : null
+
     const updated = {
       player: promo
         ? { ...updatedPlayer, title: promo.newTitle, salary: promo.newSalary, level: promo.newLevel }
@@ -623,6 +633,16 @@ Timely responses to opposing counsel and court notices are not optional. This ha
                 ...(c.actionTimestamps || {}),
                 [actionId]: state.currentDate,
               },
+              actionQualityScores: {
+                ...(c.actionQualityScores || {}),
+                [actionId]: qualityScore,
+              },
+              caseHealth: healthDelta !== 0
+                ? Math.max(0, Math.min(100, (c.caseHealth ?? 100) + healthDelta))
+                : (c.caseHealth ?? 100),
+              caseHealthEvents: healthEvent
+                ? [...(c.caseHealthEvents || []), healthEvent]
+                : (c.caseHealthEvents || []),
             }
           : c
       ),
