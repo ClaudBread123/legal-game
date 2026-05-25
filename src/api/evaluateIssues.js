@@ -1,9 +1,9 @@
 import { callClaude } from './anthropicProxy.js'
 import { ISSUE_TYPES } from '../data/issueTypes.js'
+import { FL_768_28_FULL } from '../data/legalKnowledgeBase.js'
 
 const XP_MAP = { critical: 100, major: 50, minor: 20 }
 
-// Penalty for INCORRECTLY flagging an issue (based on how significant that issue type is)
 const INCORRECT_FLAG_PENALTY = { critical: 60, major: 30, minor: 15 }
 const ISSUE_SEVERITY_MAP = Object.fromEntries(ISSUE_TYPES.map(i => [i.id, i.severity_hint || 'minor']))
 const TOTAL_ISSUE_COUNT = ISSUE_TYPES.length
@@ -18,16 +18,13 @@ function hasWhistleblowerClaim(caseObject) {
   )
 }
 
-// Returns { penalize: boolean, note: string | null }
-// penalize: false → don't count as incorrectly flagged, show educational note instead
-// applicable: false on a hidden issue → don't count as missed
 function validateIssueApplicability(issueId, caseObject) {
   switch (issueId) {
     case 'hb145_cap_applicability':
       if (has1983Claim(caseObject)) {
         return {
           applicable: false,
-          note: 'Thoughtful flag. HB 145\'s increased caps ($350,000 per person / $500,000 per occurrence) apply to state tort claims accruing on or after October 1, 2026. However, on this case the dominant claims are under 42 U.S.C. §1983 — federal civil rights claims to which sovereign immunity caps do not apply. §1983 exposure is uncapped. The cap analysis matters most for Count I (whistle-blower), but that claim has its own statutory framework. No XP deduction — this shows careful thinking.',
+          note: 'Thoughtful flag. HB 145\'s increased caps ($350,000 per person / $500,000 per occurrence) apply to state tort claims accruing on or after October 1, 2026. However, on this case the dominant claims are under 42 U.S.C. §1983 — federal civil rights claims to which sovereign immunity caps do not apply. §1983 exposure is uncapped. No XP deduction — this shows careful thinking.',
         }
       }
       if (!caseObject.hb145Applicable) {
@@ -153,7 +150,12 @@ function localEvaluate(caseObject, selectedIssueIds) {
 }
 
 export async function evaluateIssueAnalysis({ caseObject, selectedIssueIds, playerLevel }) {
-  const system = `You are a senior partner at Llopiz Wizel LLP evaluating a junior associate's issue analysis on a Florida governmental defense case. Be direct, educational, and specific. Always cite Florida statutes and explain the practical consequences of missed issues. Output valid JSON only, no markdown.`
+  const system = `You are a senior partner at Llopiz Wizel LLP evaluating a junior associate's issue analysis on a Florida governmental defense case. Be direct, educational, and specific. Always cite Florida statutes and explain the practical consequences of missed issues. Output valid JSON only, no markdown.
+
+AUTHORITATIVE LEGAL REFERENCE — APPLY ONLY THIS LAW:
+${FL_768_28_FULL}
+
+Apply the correct HB 145 provisions based on the case's incident date. Claims accruing before October 1, 2026 use old caps ($200k/$300k) and 3-year notice window. Claims accruing on or after October 1, 2026 use new caps ($350k/$500k) and 18-month notice window.`
 
   const userMessage = `Evaluate this issue analysis.
 
@@ -161,6 +163,7 @@ Fact scenario: ${caseObject.factScenario}
 Claims asserted: ${JSON.stringify(caseObject.claimsAsserted)}
 Actual hidden issues: ${JSON.stringify(caseObject.hiddenIssues)}
 Player selected issue IDs: ${JSON.stringify(selectedIssueIds)}
+HB 145 applicable: ${caseObject.hb145Applicable}
 
 IMPORTANT VALIDATION RULES:
 - If the case has §1983 claims and player flags hb145_cap_applicability, do NOT penalize — it shows nuanced thinking.
@@ -180,7 +183,7 @@ Return JSON:
 }
 
 XP awards: critical issue identified = 100, major = 50, minor = 20.
-XP deductions: incorrectly flagged = -60 if critical issue type, -30 if major, -15 if minor (check severity_hint in issue types).
+XP deductions: incorrectly flagged = -60 if critical issue type, -30 if major, -15 if minor.
 If player selected ALL 10 issue types: apply additional -50 XP spray-and-pray penalty.
 totalXP must be Math.max(0, gained - deducted).
 Include penaltyBreakdown: { gained, deducted, sprayPenalty, rawXP, totalXP, isSprayAndPray, oniersNote } when deducted > 0.
@@ -189,7 +192,6 @@ legallyNuanced items get 0 XP deduction.`
   try {
     const text = await callClaude({ system, userMessage, maxTokens: 1400 })
     const parsed = JSON.parse(text)
-    // Ensure legallyNuanced field exists even if API omits it
     if (!parsed.legallyNuanced) parsed.legallyNuanced = []
     return parsed
   } catch {

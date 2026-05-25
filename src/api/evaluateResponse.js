@@ -1,4 +1,6 @@
 import { callClaude } from './anthropicProxy.js'
+import { getLegalContextForAction } from '../data/legalKnowledgeBase.js'
+import { withConfidenceRetry } from './withConfidenceRetry.js'
 
 export async function evaluateResponse({
   caseObject,
@@ -8,7 +10,14 @@ export async function evaluateResponse({
   playerTitle,
   checkData,
 }) {
+  const legalContext = getLegalContextForAction(actionId, caseObject)
+
   const systemPrompt = `You are Onier Llopiz, senior partner at Llopiz Wizel LLP, evaluating a junior attorney's written legal analysis.
+
+AUTHORITATIVE LEGAL REFERENCE:
+${legalContext}
+
+Apply only the law above. Do not drift from these provisions. The HB 145 effective date is October 1, 2026 — apply old or new provisions based on the case's incident date.
 
 You evaluate responses on this spectrum:
 - EXCELLENT: Identifies all key issues, correct legal analysis, proper statute citations, strategic thinking demonstrated
@@ -18,6 +27,13 @@ You evaluate responses on this spectrum:
 - DEFICIENT: Misses critical issues or contains fundamental legal errors
 
 Law is not always black and white. Credit creative but legally sound approaches. Penalize only genuine errors and significant omissions.
+
+CONFIDENCE SCORING:
+Score your confidence in the legal accuracy of this evaluation:
+HIGH: Every legal proposition is directly supported by the provided statutory text or is well-established Florida law you are certain of. No speculation.
+MEDIUM: Core analysis is sound but some peripheral points involve inference or application beyond the provided text.
+LOW: Significant uncertainty about one or more legal propositions. Professional verification recommended.
+Be honest. If you are uncertain, say LOW.
 
 You must output ONLY valid JSON. No markdown.`
 
@@ -48,7 +64,9 @@ Return JSON:
   "strengths": ["specific strength from their actual response"],
   "gaps": [{"issue": "what was missed or wrong", "consequence": "real-world consequence", "statute": "relevant statute or null"}],
   "modelApproach": "what excellent performance looks like on this specific action for this specific case — 3-4 sentences",
-  "oniersNote": "personal note from Onier — direct, specific to what they wrote, educational — 1-2 sentences"
+  "oniersNote": "personal note from Onier — direct, specific to what they wrote, educational — 1-2 sentences",
+  "confidenceScore": "HIGH|MEDIUM|LOW",
+  "confidenceRationale": "brief explanation of confidence level"
 }
 
 Quality score mapping:
@@ -59,9 +77,14 @@ Quality score mapping:
   DEFICIENT: qualityScore 1, xpMultiplier 0.1`
 
   try {
-    const response = await callClaude({ system: systemPrompt, userMessage: userPrompt, maxTokens: 1500 })
-    const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
-    return JSON.parse(clean)
+    return await withConfidenceRetry(
+      async (a) => {
+        const response = await callClaude(a)
+        const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+        return JSON.parse(clean)
+      },
+      { system: systemPrompt, userMessage: userPrompt, maxTokens: 1500 }
+    )
   } catch (err) {
     return getFallbackEvaluation(playerResponse, actionId, checkData)
   }

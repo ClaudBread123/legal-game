@@ -1,9 +1,136 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import FirmLogo from '../components/shared/FirmLogo.jsx'
 import { formatGameDate } from '../utils/dateUtils.js'
 
+// ── Case generation loading screen ──────────────────────
+function CaseLoadingScreen() {
+  const [phase, setPhase] = useState(0)
+  const [dots, setDots] = useState('.')
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 500)
+    const t2 = setTimeout(() => setPhase(2), 2000)
+    const t3 = setTimeout(() => setPhase(3), 15000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [])
+
+  useEffect(() => {
+    if (phase < 1) return
+    const interval = setInterval(() => {
+      setDots(d => d.length >= 3 ? '.' : d + '.')
+    }, 500)
+    return () => clearInterval(interval)
+  }, [phase])
+
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '24px',
+    }}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        style={{ textAlign: 'center', maxWidth: '420px', width: '100%' }}
+      >
+        <FirmLogo size="lg" />
+
+        <AnimatePresence>
+          {phase >= 1 && (
+            <motion.div
+              key="reviewing"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              style={{
+                marginTop: '32px',
+                fontSize: '16px', color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+              }}
+            >
+              Reviewing your assigned matters{dots}
+            </motion.div>
+          )}
+
+          {phase >= 2 && (
+            <motion.div
+              key="matter-type"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              style={{
+                marginTop: '20px',
+                padding: '12px 20px',
+                background: 'rgba(201,168,76,0.08)',
+                border: '1px solid var(--accent-gold)44',
+                borderRadius: '6px',
+                fontSize: '13px', color: 'var(--accent-gold)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              Incoming matter: Florida Municipal Defense — Tort Claim
+            </motion.div>
+          )}
+
+          {phase >= 3 && (
+            <motion.div
+              key="slow"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4 }}
+              style={{
+                marginTop: '16px',
+                fontSize: '12px', color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              Taking a moment longer than usual...
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  )
+}
+
+// ── "Matter assigned" confirmation screen ────────────────
+function MatterAssignedScreen() {
+  return (
+    <div style={{
+      minHeight: '100vh', background: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '24px',
+    }}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35 }}
+        style={{ textAlign: 'center' }}
+      >
+        <div style={{
+          fontSize: '32px', marginBottom: '16px',
+          color: '#4ade80',
+        }}>
+          ✓
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-serif)', fontSize: '18px',
+          color: 'var(--text-primary)', marginBottom: '6px',
+        }}>
+          Matter assigned.
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
+          Proceeding to dashboard...
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ── Welcome back screen ──────────────────────────────────
 function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
   const [confirming, setConfirming] = useState(false)
 
@@ -22,19 +149,13 @@ function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
         <FirmLogo size="md" />
         <div style={{ width: '40px', height: '1px', background: 'var(--accent-gold)', margin: '20px auto' }} />
 
-        <h2 style={{
-          fontFamily: 'var(--font-serif)', fontSize: '28px', margin: '0 0 6px',
-          color: 'var(--text-primary)',
-        }}>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: '28px', margin: '0 0 6px', color: 'var(--text-primary)' }}>
           Welcome back, {player.name}.
         </h2>
         <div style={{ fontSize: '16px', color: 'var(--accent-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
           {player.title}
         </div>
-        <div style={{
-          fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
-          marginBottom: '28px',
-        }}>
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '28px' }}>
           {player.xp} XP
         </div>
 
@@ -114,12 +235,13 @@ function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
   )
 }
 
+// ── Main Onboarding ──────────────────────────────────────
 export default function Onboarding({ onReady }) {
   const { initGame, resetGame, player, currentDate, gameStarted, staleGameCleared } = useGameStore()
   const [name, setName] = useState('Joshy Llopiz')
+  const [loadingState, setLoadingState] = useState('idle') // 'idle' | 'generating' | 'assigned'
 
-  // Existing save → show welcome-back screen
-  if (gameStarted) {
+  if (gameStarted && loadingState === 'idle') {
     return (
       <WelcomeBack
         player={player}
@@ -133,10 +255,29 @@ export default function Onboarding({ onReady }) {
     )
   }
 
-  const handleSubmit = e => {
+  if (loadingState === 'generating') {
+    return <CaseLoadingScreen />
+  }
+
+  if (loadingState === 'assigned') {
+    return <MatterAssignedScreen />
+  }
+
+  const handleSubmit = async e => {
     e.preventDefault()
     if (!name.trim()) return
-    initGame(name.trim())
+
+    setLoadingState('generating')
+
+    try {
+      await initGame(name.trim())
+      setLoadingState('assigned')
+      // Brief pause to show the "Matter assigned" confirmation
+      await new Promise(r => setTimeout(r, 700))
+    } catch {
+      // initGame handles its own fallback internally; just proceed
+    }
+
     if (onReady) onReady()
   }
 

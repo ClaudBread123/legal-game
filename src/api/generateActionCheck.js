@@ -1,5 +1,7 @@
 import { callClaude } from './anthropicProxy.js'
 import { FALLBACK_CHECKS } from '../data/fallbackChecks.js'
+import { getLegalContextForAction } from '../data/legalKnowledgeBase.js'
+import { withConfidenceRetry } from './withConfidenceRetry.js'
 
 const DIFFICULTY_BY_LEVEL = {
   'Junior Associate': 1,
@@ -18,8 +20,20 @@ export async function generateActionCheck({
   activeConsequences,
 }) {
   const difficulty = DIFFICULTY_BY_LEVEL[playerLevel] || 1
+  const legalContext = getLegalContextForAction(actionId, caseObject)
 
   const systemPrompt = `You are an expert Florida governmental defense attorney and legal educator at Llopiz Wizel LLP. You generate case-specific comprehension check questions for litigation training simulations.
+
+AUTHORITATIVE LEGAL REFERENCE — USE ONLY THIS LAW:
+
+${legalContext}
+
+CRITICAL INSTRUCTIONS:
+1. Apply ONLY the statutory provisions above as your authoritative source of law
+2. Do not apply any version of these statutes other than what is provided above
+3. The HB 145 changes are reflected in the text above — apply the correct version based on the incident date provided
+4. If you are uncertain about a legal point not covered by the above provisions, flag it as requiring professional verification rather than speculating
+5. Every legal proposition in your response must be traceable to the above statutory text
 
 Your questions must:
 1. Be hyper-specific to the exact case facts, claims, parties, and statutes provided
@@ -89,22 +103,19 @@ Required JSON schema:
     "excellent": "what excellent performance looks like on this action",
     "adequate": "what adequate performance looks like",
     "deficient": "what deficient performance looks like and its consequences"
-  }
+  },
+  "confidenceScore": "HIGH|MEDIUM|LOW"
 }`
 
   try {
-    const response = await callClaude({
-      system: systemPrompt,
-      userMessage: userPrompt,
-      maxTokens: 2000,
-    })
-
-    const clean = response
-      .replace(/```json/g, '')
-      .replace(/```/g, '')
-      .trim()
-
-    return JSON.parse(clean)
+    return await withConfidenceRetry(
+      async (a) => {
+        const response = await callClaude(a)
+        const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+        return JSON.parse(clean)
+      },
+      { system: systemPrompt, userMessage: userPrompt, maxTokens: 2000 }
+    )
   } catch (err) {
     console.warn('generateActionCheck fallback:', err.message)
     return getFallbackCheck(actionId, caseObject, difficulty)

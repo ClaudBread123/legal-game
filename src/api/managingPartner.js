@@ -1,4 +1,6 @@
 import { callClaude } from './anthropicProxy.js'
+import { FL_768_28_FULL, FL_1983_REMOVAL } from '../data/legalKnowledgeBase.js'
+import { withConfidenceRetry } from './withConfidenceRetry.js'
 
 const MP_RESPONSES = {
   barred_individual_defendant: playerName => `${playerName},
@@ -132,7 +134,6 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 — OL`
   }
 
-  // Sort missed by severity
   const sorted = [...missed].sort((a, b) => {
     const ai = SEVERITY_ORDER.indexOf(a.severity)
     const bi = SEVERITY_ORDER.indexOf(b.severity)
@@ -148,10 +149,8 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 
   if (paragraphs.length === 1) return paragraphs[0]
 
-  // For multiple issues: use first paragraph fully, then append abbreviated follow-ups
   const [first, ...rest] = paragraphs
   const restSummaries = rest.map(p => {
-    // Take first two sentences of each additional response
     const sentences = p.split('\n\n').slice(1, 3).join('\n\n')
     return sentences
   })
@@ -160,7 +159,20 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 }
 
 export async function getMPReview({ caseObject, issueEvaluation, completedActions, playerName }) {
-  const system = `You are Onier Llopiz, founding partner of Llopiz Wizel LLP, a Florida firm specializing in governmental defense. You are conducting a case review with your associate ${playerName}. You are direct, experienced, and deeply knowledgeable about Florida governmental tort law, sovereign immunity, §768.28, and the Florida Rules of Civil Procedure. You educate through consequence — you explain not just what was missed, but what will happen because it was missed. You are not cruel, but you are unsparing. You always cite specific statutes and procedural rules. Your reviews are 4-6 paragraphs. Speak directly to the associate by name. Sign off as "— OL".`
+  const system = `You are Onier Llopiz, founding partner of Llopiz Wizel LLP, a Florida firm specializing in governmental defense. You are conducting a case review with your associate ${playerName}. You are direct, experienced, and deeply knowledgeable about Florida governmental tort law, sovereign immunity, §768.28, and the Florida Rules of Civil Procedure. You educate through consequence — you explain not just what was missed, but what will happen because it was missed. You are not cruel, but you are unsparing. You always cite specific statutes and procedural rules. Your reviews are 4-6 paragraphs. Speak directly to the associate by name. Sign off as "— OL".
+
+LEGAL REFERENCE FOR THIS REVIEW:
+${FL_768_28_FULL}
+${FL_1983_REMOVAL}
+
+Your legal advice must be consistent with these provisions. Cite specific subsections when giving legal guidance.
+
+CONFIDENCE SCORING — include in your JSON response:
+HIGH: Every legal proposition is directly supported by the statutory text above.
+MEDIUM: Core advice is sound but some points involve inference.
+LOW: Significant uncertainty. Flag it.
+
+Output ONLY valid JSON. No markdown.`
 
   const userMessage = `Review this case with the associate.
 
@@ -172,10 +184,24 @@ Missed issues: ${JSON.stringify(issueEvaluation?.missed || [])}
 Correctly identified: ${JSON.stringify(issueEvaluation?.correctlyIdentified || [])}
 Completed actions so far: ${JSON.stringify(completedActions || [])}
 
-Provide a direct, educational case review. Cite specific statutes. Explain the practical consequences of any missed issues.`
+Provide a direct, educational case review. Cite specific statutes. Explain the practical consequences of any missed issues.
+
+Return JSON:
+{
+  "review": "the full review text, 4-6 paragraphs, signed — OL",
+  "confidenceScore": "HIGH|MEDIUM|LOW"
+}`
 
   try {
-    return await callClaude({ system, userMessage, maxTokens: 900 })
+    const result = await withConfidenceRetry(
+      async (a) => {
+        const response = await callClaude(a)
+        const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+        return JSON.parse(clean)
+      },
+      { system, userMessage, maxTokens: 1000 }
+    )
+    return result.review || buildOfflineResponse(playerName, issueEvaluation)
   } catch {
     return buildOfflineResponse(playerName, issueEvaluation)
   }
