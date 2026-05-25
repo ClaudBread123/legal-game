@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { FALLBACK_CASES, getNextFallbackCase } from '../data/fallbackCases.js'
-import { generateCase } from '../api/caseGenerator.js'
+import { generateCase, generateComplaintDocument } from '../api/caseGenerator.js'
 import { shouldTriggerResolution, determineResolutionPath } from '../utils/caseResolution.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { checkPromotionEligibility } from '../utils/scoring.js'
@@ -340,6 +340,14 @@ You MUST generate a state tort case involving a Florida city or county municipal
       'info'
     )
 
+    // Step 5b: Generate complaint document asynchronously (non-blocking)
+    generateComplaintDocument(case1).then(doc => {
+      const s = get()
+      const upd = { cases: s.cases.map(c => c.caseId === case1.caseId ? { ...c, complaintDocument: doc } : c) }
+      set(upd)
+      persist({ ...s, ...upd })
+    }).catch(() => {})
+
     // Step 6: Generate Case 2 in background (no await — can take time)
     const case2Type = Math.random() > 0.5 ? 'section_1983' : 'employment'
     generateCase({
@@ -384,8 +392,16 @@ You MUST generate a state tort case involving a Florida city or county municipal
 
     // Run email engine
     const newEmailResults = checkAndGenerateEmails(state)
-    const newEmails = newEmailResults.map(r => ({ ...r.email, to: state.player.name }))
+    const newEmails = newEmailResults.filter(r => r.email).map(r => ({ ...r.email, to: state.player.name }))
     const newEventKeys = newEmailResults.map(r => r.key)
+
+    // Collect case updates from email engine (e.g. rfaDeadline set when discovery fires)
+    const emailCaseUpdates = {}
+    for (const r of newEmailResults) {
+      if (r.caseUpdates && r.caseId) {
+        emailCaseUpdates[r.caseId] = { ...(emailCaseUpdates[r.caseId] || {}), ...r.caseUpdates }
+      }
+    }
 
     // Run consequences engine
     const consequenceResult = evaluateConsequences(stateWithNextDate)
@@ -409,7 +425,9 @@ You MUST generate a state tort case involving a Florida city or county municipal
     })
 
     // Stagger Case 2 assignment at totalGameDays === 8
-    let activeCases = consequenceResult.updatedCases
+    let activeCases = consequenceResult.updatedCases.map(c =>
+      emailCaseUpdates[c.caseId] ? { ...c, ...emailCaseUpdates[c.caseId] } : c
+    )
     let pendingCases = state.pendingCases || []
     const assignmentEmails = []
     const assignmentActivity = []

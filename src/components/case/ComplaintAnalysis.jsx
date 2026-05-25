@@ -113,6 +113,47 @@ export default function ComplaintAnalysis({ caseObject }) {
 
   return (
     <div>
+      {/* Complaint Document */}
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>
+          COMPLAINT — FOR REVIEW
+        </div>
+        {caseObject.complaintDocument ? (
+          <div style={{
+            background: '#f8f6f0',
+            color: '#1a1a2e',
+            fontFamily: 'Georgia, "Times New Roman", serif',
+            fontSize: '13px',
+            lineHeight: '1.85',
+            padding: '40px',
+            borderRadius: '4px',
+            whiteSpace: 'pre-wrap',
+            maxHeight: '520px',
+            overflowY: 'auto',
+            border: '1px solid #d4c9a8',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}>
+            {caseObject.complaintDocument}
+          </div>
+        ) : (
+          <div style={{
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            padding: '48px 40px',
+            textAlign: 'center',
+            color: 'var(--text-muted)',
+            fontSize: '13px',
+            fontStyle: 'italic',
+          }}>
+            Preparing complaint document...
+          </div>
+        )}
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '8px' }}>
+          Review this complaint carefully before proceeding to issue identification.
+        </div>
+      </div>
+
       {/* Fact Scenario */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600 }}>

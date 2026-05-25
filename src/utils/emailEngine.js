@@ -2,6 +2,12 @@ import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
 import { calculateDeadlines } from './deadlineEngine.js'
 import { daysBetween } from './dateUtils.js'
 
+function addDaysISO(isoDate, n) {
+  const d = new Date(isoDate + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
 const JUDGES = ['Hon. Patricia Morales', 'Hon. David Chen', 'Hon. Sandra Williams']
 const OPPOSING_COUNSEL = 'James R. Thornton, Esq.'
 
@@ -95,14 +101,54 @@ export function checkAndGenerateEmails(state) {
 
       const oppKey = `opposing_notices_client_depo_${c.caseId}`
       if (daysSinceFiling >= 45 && !alreadyFired(oppKey)) {
+        const depoDate = addCalendarDays(currentDate, 14)
         emails.push({
           key: oppKey,
-          email: makeEmail(EMAIL_TEMPLATES.opposing_notices_client_depo, {
-            opposingCounsel: OPPOSING_COUNSEL,
+          caseId: c.caseId,
+          email: {
+            id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+            timestamp: currentDate,
+            read: false,
+            responded: false,
             caseId: c.caseId,
-            clientRepName: `Risk Manager, ${c.defendant}`,
-            depoDate: addCalendarDays(currentDate, 14),
-          }, state),
+            from: OPPOSING_COUNSEL,
+            fromEmail: 'counsel@plaintifflaw.com',
+            subject: `Notice of Taking Deposition — ${c.caseId}`,
+            priority: 'urgent',
+            body: `Counsel,
+
+Please be advised that Plaintiff will take the deposition of Risk Manager, ${c.defendant} in the above-referenced matter on ${depoDate} at 10:00 AM at our offices.
+
+Please confirm the witness's availability or contact us immediately to arrange an alternative date.
+
+${OPPOSING_COUNSEL}
+Plaintiff's Counsel`,
+            requiresResponse: true,
+            responseDeadlineGameDays: 3,
+            responseOptions: [
+              {
+                id: 'confirm',
+                label: 'Confirm deposition',
+                text: `We confirm availability for the deposition on ${depoDate}. Please provide a conference room address.`,
+                consequence: 'depo_confirmed',
+                xp: 5,
+              },
+              {
+                id: 'reschedule',
+                label: 'Request reschedule',
+                text: `The witness is unavailable on ${depoDate}. Please contact us to schedule an alternative date with adequate notice.`,
+                consequence: 'depo_rescheduled',
+                xp: 10,
+              },
+              {
+                id: 'object',
+                label: 'Object — inadequate notice',
+                text: `We object to this notice as failing to provide adequate time for preparation. We request an extension of at least 30 days.`,
+                consequence: null,
+                xp: 0,
+              },
+            ],
+          },
         })
       }
     }
@@ -132,6 +178,155 @@ export function checkAndGenerateEmails(state) {
           }, state),
         })
       }
+    }
+
+    // ── 5. Opposing discovery served at day 25 ──
+    const discoveryKey = `opposing_discovery_${c.caseId}`
+    if (daysSinceFiling >= 25 && !alreadyFired(discoveryKey)) {
+      const rfaDeadline = addDaysISO(currentDate, 30)
+      emails.push({
+        key: discoveryKey,
+        caseId: c.caseId,
+        caseUpdates: { rfaDeadline },
+        email: {
+          id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+          timestamp: currentDate,
+          read: false,
+          responded: false,
+          caseId: c.caseId,
+          from: OPPOSING_COUNSEL,
+          fromEmail: 'counsel@plaintifflaw.com',
+          subject: `Notice of Service of Discovery — ${c.caseId}`,
+          priority: 'urgent',
+          body: `Counsel,
+
+Please be advised that Plaintiff has this date served upon Defendant a Request for Admissions, Interrogatories, and Request for Production of Documents in the above-referenced matter.
+
+Pursuant to the Florida Rules of Civil Procedure, your responses are due within thirty (30) days of service (by ${addCalendarDays(currentDate, 30)}).
+
+Please govern yourself accordingly.
+
+${OPPOSING_COUNSEL}
+Plaintiff's Counsel`,
+        },
+      })
+    }
+
+    // ── 6. Motion to compel if discovery unanswered past deadline ──
+    const mtcKey = `opposing_mtc_${c.caseId}`
+    if (c.rfaDeadline && currentDate > c.rfaDeadline && !completed.includes('respond_to_discovery') && !alreadyFired(mtcKey)) {
+      emails.push({
+        key: mtcKey,
+        caseId: c.caseId,
+        email: {
+          id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+          timestamp: currentDate,
+          read: false,
+          responded: false,
+          caseId: c.caseId,
+          from: OPPOSING_COUNSEL,
+          fromEmail: 'counsel@plaintifflaw.com',
+          subject: `Motion to Compel Discovery Responses — ${c.caseId}`,
+          priority: 'urgent',
+          body: `Counsel,
+
+Plaintiff's discovery in the above-referenced matter was due on or about ${c.rfaDeadline}, and responses remain outstanding.
+
+Plaintiff is preparing a Motion to Compel and will seek an award of attorneys' fees and costs as sanctions for the failure to respond.
+
+Please provide complete responses within three (3) business days or we will have no choice but to seek court intervention.
+
+${OPPOSING_COUNSEL}
+Plaintiff's Counsel`,
+        },
+      })
+    }
+
+    // ── 7. Opposition to MSJ filed 14 days after MSJ ──
+    if (completed.includes('motion_summary_judgment')) {
+      const msjDate = timestamps['motion_summary_judgment']
+      if (msjDate) {
+        const daysSinceMSJ = daysBetween(msjDate, currentDate)
+        const oppMsjKey = `opposing_opp_msj_${c.caseId}`
+        if (daysSinceMSJ >= 14 && !alreadyFired(oppMsjKey)) {
+          emails.push({
+            key: oppMsjKey,
+            caseId: c.caseId,
+            email: {
+              id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+              timestamp: currentDate,
+              read: false,
+              responded: false,
+              caseId: c.caseId,
+              from: OPPOSING_COUNSEL,
+              fromEmail: 'counsel@plaintifflaw.com',
+              subject: `Opposition to Motion for Summary Judgment — ${c.caseId}`,
+              priority: 'high',
+              body: `Counsel,
+
+Plaintiff has filed an Opposition to Defendant's Motion for Summary Judgment in the above-referenced matter. The Opposition argues that genuine issues of material fact remain in dispute, including questions regarding scope of employment and the adequacy of pre-suit notice.
+
+Please review and advise whether a reply memorandum will be filed.
+
+${OPPOSING_COUNSEL}
+Plaintiff's Counsel`,
+            },
+          })
+        }
+      }
+    }
+
+    // ── 8. Mediation demand at day 90 ──
+    const medKey = `mediation_demand_${c.caseId}`
+    if (daysSinceFiling >= 90 && !alreadyFired(medKey)) {
+      emails.push({
+        key: medKey,
+        caseId: c.caseId,
+        email: {
+          id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+          timestamp: currentDate,
+          read: false,
+          responded: false,
+          caseId: c.caseId,
+          from: OPPOSING_COUNSEL,
+          fromEmail: 'counsel@plaintifflaw.com',
+          subject: `Demand for Mediation — ${c.caseId}`,
+          priority: 'high',
+          body: `Counsel,
+
+Pursuant to Florida Rule of Civil Procedure 1.700 and the applicable Local Rules, Plaintiff hereby demands that the parties proceed to court-ordered mediation in the above-referenced matter.
+
+Please advise on your client's availability for mediation within the next 60 days and your preferred mediator.
+
+${OPPOSING_COUNSEL}
+Plaintiff's Counsel`,
+          requiresResponse: true,
+          responseDeadlineGameDays: 5,
+          responseOptions: [
+            {
+              id: 'agree',
+              label: 'Agree to mediation',
+              text: `We agree to proceed with mediation. We will coordinate availability within the next 60 days and provide a proposed mediator list.`,
+              consequence: 'mediation_agreed',
+              xp: 15,
+            },
+            {
+              id: 'propose_mediator',
+              label: 'Agree and propose mediator',
+              text: `We agree to mediation and propose retired Judge Patricia Morales as mediator. Please confirm her availability is acceptable to your client.`,
+              consequence: 'mediation_agreed',
+              xp: 20,
+            },
+            {
+              id: 'object',
+              label: 'Object — discovery incomplete',
+              text: `This demand is premature. Discovery has not been completed. We request that mediation be deferred until all pending discovery is resolved.`,
+              consequence: 'mediation_deferred',
+              xp: -5,
+            },
+          ],
+        },
+      })
     }
   }
 

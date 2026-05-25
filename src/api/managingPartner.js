@@ -1,6 +1,4 @@
 import { callClaude } from './anthropicProxy.js'
-import { FL_768_28_FULL, FL_1983_REMOVAL } from '../data/legalKnowledgeBase.js'
-import { withConfidenceRetry } from './withConfidenceRetry.js'
 
 const MP_RESPONSES = {
   barred_individual_defendant: playerName => `${playerName},
@@ -159,49 +157,23 @@ Push forward on discovery sequencing and get the motion to dismiss on file. I'll
 }
 
 export async function getMPReview({ caseObject, issueEvaluation, completedActions, playerName }) {
-  const system = `You are Onier Llopiz, founding partner of Llopiz Wizel LLP, a Florida firm specializing in governmental defense. You are conducting a case review with your associate ${playerName}. You are direct, experienced, and deeply knowledgeable about Florida governmental tort law, sovereign immunity, §768.28, and the Florida Rules of Civil Procedure. You educate through consequence — you explain not just what was missed, but what will happen because it was missed. You are not cruel, but you are unsparing. You always cite specific statutes and procedural rules. Your reviews are 4-6 paragraphs. Speak directly to the associate by name. Sign off as "— OL".
+  const system = `You are Onier Llopiz, founding partner at Llopiz Wizel LLP, Florida governmental defense firm. You conduct case reviews with associates. Direct, experienced, educational. Cite specific Florida statutes. Explain consequences. Speak directly to the associate by name. Sign off as "— OL". Output ONLY valid JSON. No markdown.`
 
-LEGAL REFERENCE FOR THIS REVIEW:
-${FL_768_28_FULL}
-${FL_1983_REMOVAL}
-
-Your legal advice must be consistent with these provisions. Cite specific subsections when giving legal guidance.
-
-CONFIDENCE SCORING — include in your JSON response:
-HIGH: Every legal proposition is directly supported by the statutory text above.
-MEDIUM: Core advice is sound but some points involve inference.
-LOW: Significant uncertainty. Flag it.
-
-Output ONLY valid JSON. No markdown.`
-
-  const userMessage = `Review this case with the associate.
-
-Associate name: ${playerName}
+  const userMessage = `Case review for ${playerName}.
 Case: ${caseObject.caseId} — ${caseObject.defendant}
-Fact scenario: ${caseObject.factScenario}
-Claims: ${JSON.stringify(caseObject.claimsAsserted)}
-Missed issues: ${JSON.stringify(issueEvaluation?.missed || [])}
-Correctly identified: ${JSON.stringify(issueEvaluation?.correctlyIdentified || [])}
-Completed actions so far: ${JSON.stringify(completedActions || [])}
+Facts: ${caseObject.factScenario.substring(0, 250)}
+Case health: ${caseObject.caseHealth ?? 100}/100
+Completed actions: ${(completedActions || []).join(', ') || 'none'}
+Missed critical issues: ${(issueEvaluation?.missed || []).map(i => i.issueId).join(', ') || 'none'}
 
-Provide a direct, educational case review. Cite specific statutes. Explain the practical consequences of any missed issues.
-
-Return JSON:
-{
-  "review": "the full review text, 4-6 paragraphs, signed — OL",
-  "confidenceScore": "HIGH|MEDIUM|LOW"
-}`
+Write a 3-4 paragraph case review. Cite Florida statutes. Explain consequences of any missed issues.
+Return JSON: { "review": "full review text signed — OL", "confidenceScore": "HIGH|MEDIUM|LOW" }`
 
   try {
-    const result = await withConfidenceRetry(
-      async (a) => {
-        const response = await callClaude(a)
-        const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
-        return JSON.parse(clean)
-      },
-      { system, userMessage, maxTokens: 1000 }
-    )
-    return result.review || buildOfflineResponse(playerName, issueEvaluation)
+    const response = await callClaude({ system, userMessage, maxTokens: 1000 })
+    const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(clean)
+    return parsed.review || buildOfflineResponse(playerName, issueEvaluation)
   } catch {
     return buildOfflineResponse(playerName, issueEvaluation)
   }

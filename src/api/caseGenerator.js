@@ -122,6 +122,133 @@ Return this JSON schema:
 }`
 }
 
+function extractCounty(defendant) {
+  if (!defendant) return 'Miami-Dade'
+  const countyMatch = defendant.match(/(\w[\w\s-]+?)\s+County/i)
+  if (countyMatch) return countyMatch[1] + ' County'
+  const cityMatch = defendant.match(/City\s+of\s+(\w+)/i)
+  if (cityMatch) return cityMatch[1]
+  return 'Miami-Dade'
+}
+
+function generateFallbackComplaint(caseObject) {
+  const { caseId, clientName, defendant, dateOfIncident, dateFiled, factScenario, claimsAsserted } = caseObject
+  const county = extractCounty(defendant)
+
+  const countsText = (claimsAsserted || []).map((claim, i) => {
+    const roman = ['I', 'II', 'III', 'IV', 'V'][i] || String(i + 1)
+    return `COUNT ${roman} — ${claim.toUpperCase()}
+
+${i + 1 + 7}. Plaintiff realleges paragraphs 1 through 7 as if fully set forth herein.
+
+${i + 2 + 7}. On or about ${dateOfIncident}, Defendant ${defendant} owed a duty to Plaintiff ${clientName}.
+
+${i + 3 + 7}. Defendant breached that duty, directly and proximately causing injury to Plaintiff.
+
+WHEREFORE, Plaintiff ${clientName} demands judgment against Defendant ${defendant} for compensatory damages, costs, and such other relief as this Court deems just and proper.`
+  }).join('\n\n')
+
+  return `IN THE CIRCUIT COURT OF THE ELEVENTH JUDICIAL CIRCUIT
+IN AND FOR ${county.toUpperCase()} COUNTY, FLORIDA
+
+CASE NO.: ${caseId}
+
+${clientName.toUpperCase()},
+        Plaintiff,
+
+v.
+
+${defendant.toUpperCase()}, et al.,
+        Defendants.
+                                            /
+
+COMPLAINT FOR DAMAGES
+
+COMES NOW the Plaintiff, ${clientName}, by and through undersigned counsel, and pursuant to the Florida Rules of Civil Procedure, sues Defendant ${defendant}, and states as follows:
+
+PARTIES, JURISDICTION AND VENUE
+
+1. This is an action for damages in excess of the jurisdictional threshold of this Court.
+
+2. Plaintiff ${clientName} is a natural person and resident of Florida.
+
+3. Defendant ${defendant} is a governmental entity of the State of Florida, subject to suit pursuant to §768.28, Florida Statutes.
+
+4. The cause of action accrued in ${county} County, Florida, where Defendant maintains its principal offices.
+
+5. All conditions precedent to filing this action have been met or have otherwise been waived, including any required pre-suit notice under §768.28(6), Florida Statutes.
+
+6. Venue is proper in this County pursuant to §768.28(1), Florida Statutes.
+
+GENERAL ALLEGATIONS
+
+7. On or about ${dateOfIncident}, the following events occurred giving rise to this cause of action:
+
+${factScenario}
+
+${countsText}
+
+                                    Respectfully submitted,
+
+                                    Plaintiff's Counsel
+                                    Florida Bar No.: [XXX]
+
+                                    Date Filed: ${dateFiled || new Date().toISOString().split('T')[0]}`
+}
+
+export async function generateComplaintDocument(caseObject) {
+  const system = `You generate realistic Florida state court civil complaints. Output ONLY the complaint text — no JSON, no markdown, no explanation.`
+  const userMessage = `Generate a civil complaint for:
+Plaintiff: ${caseObject.clientName}
+Defendant: ${caseObject.defendant}
+Incident date: ${caseObject.dateOfIncident}
+Facts: ${caseObject.factScenario}
+Claims: ${(caseObject.claimsAsserted || []).join(', ')}
+Case ID: ${caseObject.caseId}
+
+Format as a formal Florida circuit court complaint: caption, COMES NOW, numbered paragraphs (parties/jurisdiction, general allegations), counts with WHEREFORE clause, signature block. 400-600 words.`
+
+  try {
+    const response = await callClaude({ system, userMessage, maxTokens: 1000 })
+    if (response && response.length > 100) return response.trim()
+    return generateFallbackComplaint(caseObject)
+  } catch {
+    return generateFallbackComplaint(caseObject)
+  }
+}
+
+function assessOfflineHealth(caseObject) {
+  let health = 70
+  const issues = caseObject.hiddenIssues || []
+  health -= issues.filter(i => i.severity === 'critical').length * 8
+  health -= issues.filter(i => i.severity === 'major').length * 4
+  if ((caseObject.claimsAsserted || []).some(c => c.includes('1983'))) health -= 5
+  return Math.max(35, Math.min(95, health))
+}
+
+export async function assessInitialCaseHealth(caseObject) {
+  const system = `You assess initial litigation risk for Florida governmental defense cases. Output ONLY valid JSON. No markdown.`
+  const userMessage = `Case: ${caseObject.defendant} | Type: ${caseObject.caseType}
+Facts: ${caseObject.factScenario.substring(0, 200)}
+Claims: ${(caseObject.claimsAsserted || []).join('; ')}
+Issues: ${(caseObject.hiddenIssues || []).map(i => i.issueType + '(' + i.severity + ')').join(', ')}
+HB145: ${caseObject.hb145Applicable}
+
+Rate initial defense strength 35-95 (lower = more plaintiff-favorable, higher = stronger defense). Consider immunity arguments, pre-suit compliance, §1983 exposure.
+Return JSON: {"caseHealth": 65, "rationale": "brief reason"}`
+
+  try {
+    const response = await callClaude({ system, userMessage, maxTokens: 200 })
+    const clean = response.replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsed = JSON.parse(clean)
+    const h = parsed.caseHealth
+    if (typeof h === 'number' && h >= 35 && h <= 95) return Math.round(h)
+    return assessOfflineHealth(caseObject)
+  } catch {
+    return assessOfflineHealth(caseObject)
+  }
+}
+
 export async function generateCase({
   caseType,
   playerLevel,
@@ -192,7 +319,16 @@ export async function generateCase({
         continue
       }
 
-      // First valid case — return immediately
+      // Assess initial case health before returning
+      try {
+        const health = await assessInitialCaseHealth(caseObject)
+        caseObject.caseHealth = health
+        caseObject.initialCaseHealth = health
+        log('✓ Initial health: ' + health)
+      } catch {
+        log('⚠ Health assessment skipped')
+      }
+
       log('✓ Using AI case: ' + caseObject.defendant)
       console.log('Case accepted:', caseObject.defendant)
       return caseObject
@@ -207,6 +343,9 @@ export async function generateCase({
   }
 
   const fallback = getNextFallbackCase(existingCases.map(c => c.caseId))
+  const fallbackHealth = assessOfflineHealth(fallback)
+  fallback.caseHealth = fallbackHealth
+  fallback.initialCaseHealth = fallbackHealth
   log('✗ Using fallback: ' + fallback.defendant)
   return fallback
 }

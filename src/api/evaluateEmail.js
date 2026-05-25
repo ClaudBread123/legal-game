@@ -1,27 +1,23 @@
 import { callClaude } from './anthropicProxy.js'
 
-export async function evaluateEmail({ to, subject, body, caseObject, playerName }) {
-  const system = `You are Onier Llopiz, founding partner at Llopiz Wizel LLP, reviewing an outgoing email drafted by an associate. Evaluate the email for professional tone, legal appropriateness, strategic soundness, and whether sending it would help or harm the client. Be direct. Output ONLY valid JSON.`
+export async function evaluateEmail({ to, toEmail, subject, body, caseObject, playerName, playerTitle }) {
+  const system = `You evaluate law firm associate emails for professionalism and Florida Bar Rule compliance. Output ONLY valid JSON. No markdown.`
 
-  const userMessage = `Review this outgoing email drafted by ${playerName}.
-
-To: ${to}
+  const userMessage = `Associate: ${playerName}, ${playerTitle || 'Associate'}
+To: ${to}${toEmail ? ` (${toEmail})` : ''}
 Subject: ${subject}
-Body:
-"${body}"
+Body: "${body.substring(0, 400)}"
+Case: ${caseObject?.caseId || 'N/A'} — ${caseObject?.defendant || 'N/A'}
 
-Case context: ${caseObject?.caseId} — ${caseObject?.defendant}
-Fact scenario: ${caseObject?.factScenario || 'N/A'}
-
-Evaluate and return JSON:
+Return JSON:
 {
-  "appropriate": boolean,
-  "rating": "PROFESSIONAL|ACCEPTABLE|CONCERNING|INAPPROPRIATE",
-  "feedback": "2-3 sentences on tone, strategy, and content",
-  "concerns": ["specific concern if any"],
-  "xpEffect": number (positive for good emails, negative for problematic ones, range -50 to +30),
-  "formalWarning": boolean (true if this email would warrant a formal warning from the managing partner),
-  "oniersNote": "direct note from Onier — 1 sentence"
+  "professionalismScore": 1-5,
+  "isAppropriate": true,
+  "issues": ["specific issue if any"],
+  "consequences": {"type": "positive|warning|formal_warning", "description": "what this means", "gameEffect": "XP/career effect"},
+  "floridaBarIssue": {"exists": false, "rule": null, "description": null},
+  "feedback": "2-3 sentences on tone, strategy, content",
+  "professionalVersion": null
 }`
 
   try {
@@ -30,13 +26,13 @@ Evaluate and return JSON:
     return JSON.parse(clean)
   } catch {
     return {
-      appropriate: true,
-      rating: 'ACCEPTABLE',
+      professionalismScore: 3,
+      isAppropriate: true,
+      issues: [],
+      consequences: { type: 'positive', description: 'Email sent.', gameEffect: '+5 XP' },
+      floridaBarIssue: { exists: false, rule: null, description: null },
       feedback: 'Email reviewed. Evaluation unavailable in offline mode.',
-      concerns: [],
-      xpEffect: 5,
-      formalWarning: false,
-      oniersNote: 'Keep communications professional.',
+      professionalVersion: null,
     }
   }
 }
