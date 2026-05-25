@@ -2,6 +2,14 @@ import { callClaude } from './anthropicProxy.js'
 import { getNextFallbackCase } from '../data/fallbackCases.js'
 import { validateCase } from './validateCase.js'
 
+// Module-level debug logger — set externally for on-screen diagnostics
+let _debugLog = null
+export function setDebugLogger(fn) { _debugLog = fn }
+function log(msg) {
+  if (_debugLog) _debugLog(msg)
+  console.log('[gen]', msg)
+}
+
 const PROHIBITED_DEFENDANTS = [
   'broward county school board',
   'suncoast charter academy',
@@ -38,6 +46,45 @@ function extractIncidentType(factScenario) {
     if (fs.includes(t.replace(/-/g, ' '))) return t
   }
   return null
+}
+
+function extractJSON(response) {
+  if (!response) return null
+  let text = response.trim()
+  text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+  if (text.startsWith('{')) return text
+  const firstBrace = text.indexOf('{')
+  const lastBrace = text.lastIndexOf('}')
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return text.substring(firstBrace, lastBrace + 1)
+  }
+  return text
+}
+
+function normalizeCase(raw) {
+  return {
+    caseId: raw.caseId || raw.case_id || raw.id ||
+      'LW-2026-' + Math.floor(Math.random() * 9000 + 1000),
+    caseType: raw.caseType || raw.case_type || raw.type || 'state_tort',
+    clientName: raw.clientName || raw.client_name || raw.plaintiff ||
+      raw.plaintiffName || 'Unknown Plaintiff',
+    defendant: raw.defendant || raw.defendantName || raw.defendant_name || 'Unknown Defendant',
+    dateFiled: raw.dateFiled || raw.date_filed || new Date().toISOString().split('T')[0],
+    dateOfIncident: raw.dateOfIncident || raw.date_of_incident ||
+      raw.incidentDate || raw.dateFiled,
+    factScenario: raw.factScenario || raw.fact_scenario || raw.facts || raw.scenario || '',
+    claimsAsserted: Array.isArray(raw.claimsAsserted) ? raw.claimsAsserted
+      : Array.isArray(raw.claims) ? raw.claims
+      : Array.isArray(raw.counts) ? raw.counts : [],
+    hiddenIssues: Array.isArray(raw.hiddenIssues) ? raw.hiddenIssues
+      : Array.isArray(raw.hidden_issues) ? raw.hidden_issues
+      : Array.isArray(raw.issues) ? raw.issues : [],
+    applicableDefenses: Array.isArray(raw.applicableDefenses) ? raw.applicableDefenses
+      : Array.isArray(raw.defenses) ? raw.defenses : [],
+    previewFlag: raw.previewFlag || raw.preview_flag || raw.hint || raw.preview || '',
+    hb145Applicable: raw.hb145Applicable !== undefined
+      ? raw.hb145Applicable : (raw.hb145 || false),
+  }
 }
 
 function buildVarietyPrompt(existingCases) {
@@ -185,8 +232,8 @@ export async function generateCase({
   existingCases = [],
   constraints = {},
 }) {
-  console.log('generateCase: starting 60-second best-effort generation')
-  console.log('caseType:', caseType, '| playerLevel:', playerLevel, '| existingCases:', existingCases.length)
+  log('generateCase: starting')
+  log('type: ' + caseType + ' | level: ' + playerLevel)
 
   const TIMEOUT_MS = 60000
   const ATTEMPT_TIMEOUT_MS = 25000
@@ -197,12 +244,12 @@ export async function generateCase({
 
   const systemPrompt = buildCaseSystemPrompt()
   const userPrompt = buildCaseUserPrompt({ caseType, playerLevel, currentDate, existingCases, constraints })
-  console.log('Total prompt chars:', systemPrompt.length + userPrompt.length)
+  log('Prompt chars: ' + (systemPrompt.length + userPrompt.length))
 
   while (attempts < maxAttempts && Date.now() - startTime < TIMEOUT_MS) {
     attempts++
     const elapsed = Date.now() - startTime
-    console.log(`Attempt ${attempts}, elapsed: ${Math.round(elapsed / 1000)}s`)
+    log('Attempt ' + attempts + ' (' + Math.round(elapsed / 1000) + 's elapsed)')
 
     try {
       const response = await Promise.race([
@@ -212,45 +259,46 @@ export async function generateCase({
         ),
       ])
 
-      console.log('Response received, length:', response?.length)
+      log('✓ API responded, length: ' + response?.length)
 
-      const clean = response.replace(/```json/gi, '').replace(/```/g, '').trim()
+      const clean = extractJSON(response)
       let caseObject
       try {
-        caseObject = JSON.parse(clean)
+        const parsed = JSON.parse(clean)
+        caseObject = normalizeCase(parsed)
+        log('✓ JSON parsed OK')
       } catch (parseErr) {
-        console.warn('JSON parse failed:', parseErr.message)
-        console.warn('First 300 chars:', clean.substring(0, 300))
+        log('✗ JSON parse failed: ' + parseErr.message)
+        log('First 80: ' + (clean || '').substring(0, 80))
         continue
       }
 
-      // Validate required fields inline
-      const required = [
-        'caseId', 'caseType', 'clientName', 'defendant', 'factScenario',
-        'claimsAsserted', 'hiddenIssues', 'applicableDefenses', 'previewFlag', 'hb145Applicable',
-      ]
-      const missing = required.filter(f => caseObject[f] === undefined || caseObject[f] === null)
-      if (missing.length > 0) {
-        console.warn('Missing required fields:', missing)
+      // Only reject if truly critical fields are missing after normalization
+      const isValid = (
+        caseObject.defendant &&
+        caseObject.defendant !== 'Unknown Defendant' &&
+        caseObject.factScenario &&
+        caseObject.factScenario.length > 50
+      )
+      if (!isValid) {
+        log('✗ Critical fields missing — defendant: "' + caseObject.defendant +
+          '" scenario len: ' + caseObject.factScenario?.length)
         continue
       }
+      log('✓ Fields OK, defendant: ' + caseObject.defendant)
 
-      if (!Array.isArray(caseObject.claimsAsserted) || !Array.isArray(caseObject.hiddenIssues)) {
-        console.warn('claimsAsserted or hiddenIssues not arrays')
-        continue
-      }
-
-      // Hard prohibition check — never accept banned defendants
+      // Prohibited defendant check
       const defendantLower = caseObject.defendant.toLowerCase()
-      const isProhibited = PROHIBITED_DEFENDANTS.some(p => defendantLower.includes(p))
+      const isProhibited = PROHIBITED_DEFENDANTS.some(p =>
+        defendantLower === p || defendantLower.includes(p)
+      )
       if (isProhibited) {
-        console.warn('Prohibited defendant:', caseObject.defendant, '— retrying')
+        log('✗ Prohibited defendant: ' + caseObject.defendant)
         continue
       }
+      log('✓ Defendant OK: ' + caseObject.defendant)
 
-      console.log('Valid candidate:', caseObject.defendant, '| type:', caseObject.caseType)
-
-      // Legal validation — non-blocking, 8s max
+      // Non-blocking validation — 8s max
       let validationScore = 1
       try {
         const validation = await Promise.race([
@@ -261,39 +309,32 @@ export async function generateCase({
         ])
         if (validation.isValid && validation.confidenceScore === 'HIGH') {
           validationScore = 3
-          console.log('Validation: HIGH confidence')
         } else if (validation.isValid) {
           validationScore = 2
-          console.log('Validation: MEDIUM confidence')
-        } else {
-          validationScore = 1
-          console.log('Validation: failed but keeping as candidate')
         }
       } catch (valErr) {
-        console.warn('Validator error:', valErr.message)
-        validationScore = 1
+        log('⚠ Validator error: ' + valErr.message)
       }
+      log('Validation score: ' + validationScore)
 
       candidates.push({ caseObject, validationScore, generatedAt: Date.now() - startTime })
 
-      // Use immediately if HIGH confidence
       if (validationScore === 3) {
-        console.log('HIGH confidence — using immediately after', Math.round((Date.now() - startTime) / 1000), 'seconds')
+        log('✓ Using AI case: ' + caseObject.defendant)
         return caseObject
       }
 
-      // Use best available if running low on time
       const timeRemaining = TIMEOUT_MS - (Date.now() - startTime)
-      console.log('Time remaining:', Math.round(timeRemaining / 1000), 's')
+      log('Time remaining: ' + Math.round(timeRemaining / 1000) + 's')
       if (timeRemaining < 12000 && candidates.length >= 1) {
-        console.log('Low on time — using best available candidate')
+        log('⚠ Low on time — using best available')
         break
       }
 
     } catch (err) {
-      console.warn(`Attempt ${attempts} failed:`, err.message)
+      log('✗ Attempt ' + attempts + ' error: ' + err.message)
       if (err.message === 'API_UNAVAILABLE') {
-        console.error('API unavailable — stopping attempts')
+        log('✗ API unavailable — stopping')
         break
       }
     }
@@ -302,14 +343,11 @@ export async function generateCase({
   if (candidates.length > 0) {
     candidates.sort((a, b) => b.validationScore - a.validationScore)
     const best = candidates[0]
-    console.log(
-      'Using best candidate (score:', best.validationScore,
-      ', at:', Math.round(best.generatedAt / 1000) + 's):',
-      best.caseObject.defendant
-    )
+    log('✓ Using AI case: ' + best.caseObject.defendant + ' (score ' + best.validationScore + ')')
     return best.caseObject
   }
 
-  console.error('generateCase: zero valid candidates — using fallback')
-  return getNextFallbackCase(existingCases.map(c => c.caseId))
+  const fallback = getNextFallbackCase(existingCases.map(c => c.caseId))
+  log('✗ Using fallback: ' + fallback.defendant)
+  return fallback
 }

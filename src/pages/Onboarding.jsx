@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import FirmLogo from '../components/shared/FirmLogo.jsx'
 import { formatGameDate } from '../utils/dateUtils.js'
+import { setDebugLogger } from '../api/caseGenerator.js'
 
 // ── Case generation loading screen ──────────────────────
 const LOADING_PHASES = [
@@ -14,7 +15,7 @@ const LOADING_PHASES = [
   { at: 52000, message: 'This is taking a moment — complex matter incoming...' },
 ]
 
-function CaseLoadingScreen() {
+function CaseLoadingScreen({ debugLog = [] }) {
   const [phaseIndex, setPhaseIndex] = useState(0)
   const [progress, setProgress] = useState(0)
 
@@ -90,6 +91,35 @@ function CaseLoadingScreen() {
         }}>
           {progress}%
         </div>
+
+        {debugLog.length > 0 && (
+          <div style={{
+            marginTop: '24px',
+            background: '#0f1117',
+            border: '1px solid #2a3347',
+            borderRadius: '6px',
+            padding: '12px',
+            maxWidth: '480px',
+            width: '100%',
+            fontFamily: 'monospace',
+            fontSize: '11px',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            textAlign: 'left',
+          }}>
+            {debugLog.map((entry, i) => (
+              <div key={i} style={{
+                color: entry.startsWith('✓') ? '#4caf82'
+                  : entry.startsWith('✗') ? '#e05252'
+                  : entry.startsWith('⚠') ? '#f0b429'
+                  : '#8b95a8',
+                marginBottom: '2px',
+              }}>
+                {entry}
+              </div>
+            ))}
+          </div>
+        )}
       </motion.div>
     </div>
   )
@@ -239,6 +269,7 @@ export default function Onboarding({ onReady }) {
   const { initGame, resetGame, player, currentDate, gameStarted, staleGameCleared } = useGameStore()
   const [name, setName] = useState('Joshy Llopiz')
   const [loadingState, setLoadingState] = useState('idle') // 'idle' | 'generating' | 'assigned'
+  const [debugLog, setDebugLog] = useState([])
 
   if (gameStarted && loadingState === 'idle') {
     return (
@@ -255,7 +286,7 @@ export default function Onboarding({ onReady }) {
   }
 
   if (loadingState === 'generating') {
-    return <CaseLoadingScreen />
+    return <CaseLoadingScreen debugLog={debugLog} />
   }
 
   if (loadingState === 'assigned') {
@@ -266,17 +297,19 @@ export default function Onboarding({ onReady }) {
     e.preventDefault()
     if (!name.trim()) return
 
+    setDebugLog([])
+    setDebugLogger(msg => setDebugLog(prev => [...prev, msg]))
     setLoadingState('generating')
 
     try {
       await initGame(name.trim())
       setLoadingState('assigned')
-      // Brief pause to show the "Matter assigned" confirmation
       await new Promise(r => setTimeout(r, 700))
     } catch {
       // initGame handles its own fallback internally; just proceed
     }
 
+    setDebugLogger(null)
     if (onReady) onReady()
   }
 
