@@ -19,6 +19,8 @@ const pageVariants = {
 export default function Dashboard() {
   const { cases, currentDate, advanceDay, pendingCaseGeneration, addGeneratedCase, addToast, player, resolutionQueue, resolveCase } = useGameStore()
   const [advancing, setAdvancing] = useState(false)
+  const [testResults, setTestResults] = useState(null)
+  const [testRunning, setTestRunning] = useState(false)
   const activeCases = cases.filter(c => c.status !== 'closed')
 
   const pendingResolution = resolutionQueue?.[0] || null
@@ -61,69 +63,136 @@ export default function Dashboard() {
 
   return (
     <>
-    <button
-      onClick={async () => {
-        console.log('=== FULL API TEST START ===')
-
-        console.log('Test 1: Health check GET request')
-        try {
-          const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', { method: 'GET' })
-          const data = await res.json()
-          console.log('Health check result:', data)
-        } catch (err) {
-          console.error('Health check failed:', err)
-        }
-
-        console.log('Test 2: Real Claude API call')
-        try {
-          const result = await callClaude({
-            system: 'You are a helpful assistant.',
-            userMessage: 'Say exactly: API_WORKING',
-            maxTokens: 50,
-          })
-          console.log('Claude response:', result)
-        } catch (err) {
-          console.error('Claude call failed:', err.message)
-          console.error('Full error:', err)
-        }
-
-        console.log('Test 3: Direct POST to worker')
-        try {
-          const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              system: 'You are helpful.',
-              userMessage: 'Say: DIRECT_TEST_WORKING',
-              maxTokens: 50,
-            }),
-          })
-          console.log('Status:', res.status)
-          const text = await res.text()
-          console.log('Raw response:', text)
-        } catch (err) {
-          console.error('Direct POST failed:', err)
-        }
-
-        console.log('=== FULL API TEST END ===')
-      }}
-      style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        zIndex: 9999,
-        background: 'var(--accent-gold)',
-        color: '#000',
-        border: 'none',
-        padding: '12px 20px',
-        borderRadius: '6px',
-        cursor: 'pointer',
+    {/* API TEST PANEL - temporary diagnostic */}
+    <div style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      zIndex: 9999,
+      width: '340px',
+      background: '#1e2535',
+      border: '1px solid #2a3347',
+      borderRadius: '8px',
+      padding: '16px',
+      fontFamily: 'monospace',
+      fontSize: '12px',
+    }}>
+      <div style={{
+        color: '#c9a84c',
+        fontWeight: 'bold',
+        marginBottom: '12px',
         fontFamily: 'var(--font-sans)',
-        fontWeight: '600',
-      }}
-    >
-      Test API
-    </button>
+      }}>
+        API Diagnostic
+      </div>
+
+      <button
+        onClick={async () => {
+          setTestRunning(true)
+          setTestResults(null)
+          const results = []
+
+          results.push('TEST 1: Health check...')
+          setTestResults([...results])
+          try {
+            const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', { method: 'GET' })
+            const data = await res.json()
+            results.push('✓ Worker: ' + data.status)
+            results.push('✓ Has key: ' + data.hasApiKey)
+          } catch (err) {
+            results.push('✗ Health check: ' + err.message)
+          }
+          setTestResults([...results])
+
+          results.push('')
+          results.push('TEST 2: Direct POST...')
+          setTestResults([...results])
+          try {
+            const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                system: 'Reply with one word only.',
+                userMessage: 'Say: WORKING',
+                maxTokens: 10,
+              }),
+            })
+            results.push('Status: ' + res.status)
+            const text = await res.text()
+            results.push('Response: ' + text.substring(0, 150))
+          } catch (err) {
+            results.push('✗ POST failed: ' + err.message)
+          }
+          setTestResults([...results])
+
+          results.push('')
+          results.push('TEST 3: callClaude...')
+          setTestResults([...results])
+          try {
+            const proxyUrl = import.meta.env.VITE_API_PROXY_URL
+            results.push('URL: ' + (proxyUrl || 'NOT SET'))
+            setTestResults([...results])
+            const res = await fetch(proxyUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                system: 'Reply with one word only.',
+                userMessage: 'Say: WORKING',
+                maxTokens: 10,
+              }),
+            })
+            results.push('Status: ' + res.status)
+            const text = await res.text()
+            results.push('Response: ' + text.substring(0, 150))
+          } catch (err) {
+            results.push('✗ callClaude: ' + err.message)
+          }
+
+          results.push('')
+          results.push('DONE')
+          setTestResults([...results])
+          setTestRunning(false)
+        }}
+        disabled={testRunning}
+        style={{
+          background: testRunning ? '#4a5568' : '#c9a84c',
+          color: '#000',
+          border: 'none',
+          padding: '8px 16px',
+          borderRadius: '4px',
+          cursor: testRunning ? 'wait' : 'pointer',
+          fontWeight: '600',
+          width: '100%',
+          marginBottom: '12px',
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        {testRunning ? 'Testing...' : 'Run API Test'}
+      </button>
+
+      {testResults && (
+        <div style={{
+          background: '#0f1117',
+          padding: '10px',
+          borderRadius: '4px',
+          maxHeight: '300px',
+          overflowY: 'auto',
+        }}>
+          {testResults.map((line, i) => (
+            <div key={i} style={{
+              color: line.startsWith('✓') ? '#4caf82'
+                : line.startsWith('✗') ? '#e05252'
+                : line.startsWith('TEST') ? '#c9a84c'
+                : '#e8ecf4',
+              marginBottom: '2px',
+              wordBreak: 'break-all',
+            }}>
+              {line || ' '}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
     <motion.div
       variants={pageVariants}
       initial="initial"
