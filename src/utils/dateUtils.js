@@ -1,18 +1,13 @@
 export function getSimulatedStartDate() {
   const today = new Date()
-  // Go back at least 5 business days, landing on a Monday
-  let d = new Date(today)
+  const start = new Date(today)
   let businessDaysBack = 0
-  while (businessDaysBack < 5) {
-    d.setDate(d.getDate() - 1)
-    const day = d.getDay()
+  while (businessDaysBack < 10) {
+    start.setDate(start.getDate() - 1)
+    const day = start.getDay()
     if (day !== 0 && day !== 6) businessDaysBack++
   }
-  // Now rewind to most recent Monday
-  while (d.getDay() !== 1) {
-    d.setDate(d.getDate() - 1)
-  }
-  return d.toISOString().split('T')[0]
+  return start.toISOString().split('T')[0]
 }
 
 export function advanceBusinessDay(isoDate) {

@@ -207,4 +207,5 @@ export const defaultState = {
   toasts: [],
   pendingCaseGeneration: null,
   isGeneratingCase: false,
+  lastRealPlayedDate: null,
 }

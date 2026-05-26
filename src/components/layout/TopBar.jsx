@@ -27,11 +27,14 @@ export default function TopBar() {
 
       {/* Center: Date + Actions + Nav links */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-secondary)',
-        }}>
-          {currentDate ? formatGameDate(currentDate) : '—'}
-        </span>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-secondary)' }}>
+            {currentDate ? formatGameDate(currentDate) : '—'}
+          </div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginTop: '1px' }}>
+            CASE TIMELINE
+          </div>
+        </div>
 
         <span style={{
           fontFamily: 'var(--font-mono)', fontSize: '12px',

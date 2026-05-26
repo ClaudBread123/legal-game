@@ -83,6 +83,7 @@ export const useGameStore = create((set, get) => ({
       generatedEmailEvents: [],
       staleGameCleared: false,
       saveVersion: 'v3',
+      lastRealPlayedDate: new Date().toISOString(),
     }
     set(baseState)
     persist(baseState)
@@ -434,6 +435,7 @@ Timely responses to opposing counsel and court notices are not optional. This ha
 
     const updated = {
       currentDate: nextDate,
+      lastRealPlayedDate: new Date().toISOString(),
       cases: activeCases,
       pendingCases,
       player: finalPlayer,

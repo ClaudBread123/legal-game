@@ -2,12 +2,13 @@ import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import { CAREER_LADDER } from '../data/careerLadder.js'
 import { BILLING_RATE } from '../data/issueTypes.js'
-import { getPromotionProgress } from '../utils/scoring.js'
+import { getPromotionProgress, getXPProgress } from '../utils/scoring.js'
 
 export default function Career() {
   const { player, cases, monthlyBillableHours } = useGameStore()
   const currentTier = CAREER_LADDER.find(t => t.title === player.title) || CAREER_LADDER[0]
   const progress = getPromotionProgress(player)
+  const xpProgress = getXPProgress(player.xp || 0)
 
   const totalHours = cases.reduce((s, c) => s + (c.hoursBilled || 0), 0)
   const totalBilled = totalHours * BILLING_RATE
@@ -22,9 +23,27 @@ export default function Career() {
         <div style={{ fontSize: '18px', color: 'var(--accent-gold)', fontFamily: 'var(--font-serif)', marginBottom: '4px' }}>
           {player.title}
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '28px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '12px' }}>
           {player.xp.toLocaleString()} XP · Day {player.totalGameDays || 0} · {player.casesWorked || 0} cases worked · {Math.round((player.totalBillableHours || 0) * 10) / 10}h billed
         </div>
+
+        {/* XP progress bar within current tier */}
+        {xpProgress.nextThreshold && (
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              <span>XP: {xpProgress.current.toLocaleString()}</span>
+              <span>{xpProgress.percentage}% to next tier</span>
+              <span>Next: {xpProgress.nextThreshold.toLocaleString()}</span>
+            </div>
+            <div style={{ height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${xpProgress.percentage}%`,
+                background: xpProgress.percentage >= 75 ? '#4ade80' : xpProgress.percentage >= 40 ? 'var(--accent-gold)' : 'var(--text-muted)',
+                borderRadius: '3px', transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+        )}
 
         {/* PATH TO PROMOTION */}
         {progress ? (

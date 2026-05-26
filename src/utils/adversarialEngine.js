@@ -253,6 +253,7 @@ ${attySignature(attorney)}`,
           results.caseUpdates[c.caseId] = {
             ...results.caseUpdates[c.caseId],
             plaintiffMSJFiled: true,
+            plaintiffMSJDate: currentDate,
           }
           results.newNotifications.push({
             id: `plaintiff-msj-${Date.now()}`,

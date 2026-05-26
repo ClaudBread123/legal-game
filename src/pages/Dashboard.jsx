@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { callClaude } from '../api/anthropicProxy.js'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import CaseCard from '../components/dashboard/CaseCard.jsx'
@@ -19,8 +18,6 @@ const pageVariants = {
 export default function Dashboard() {
   const { cases, currentDate, advanceDay, pendingCaseGeneration, addGeneratedCase, addToast, player, resolutionQueue, resolveCase } = useGameStore()
   const [advancing, setAdvancing] = useState(false)
-  const [testResults, setTestResults] = useState(null)
-  const [testRunning, setTestRunning] = useState(false)
   const activeCases = cases.filter(c => c.status !== 'closed')
 
   const pendingResolution = resolutionQueue?.[0] || null
@@ -63,136 +60,7 @@ export default function Dashboard() {
 
   return (
     <>
-    {/* API TEST PANEL - temporary diagnostic */}
-    <div style={{
-      position: 'fixed',
-      bottom: '20px',
-      right: '20px',
-      zIndex: 9999,
-      width: '340px',
-      background: '#1e2535',
-      border: '1px solid #2a3347',
-      borderRadius: '8px',
-      padding: '16px',
-      fontFamily: 'monospace',
-      fontSize: '12px',
-    }}>
-      <div style={{
-        color: '#c9a84c',
-        fontWeight: 'bold',
-        marginBottom: '12px',
-        fontFamily: 'var(--font-sans)',
-      }}>
-        API Diagnostic
-      </div>
 
-      <button
-        onClick={async () => {
-          setTestRunning(true)
-          setTestResults(null)
-          const results = []
-
-          results.push('TEST 1: Health check...')
-          setTestResults([...results])
-          try {
-            const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', { method: 'GET' })
-            const data = await res.json()
-            results.push('✓ Worker: ' + data.status)
-            results.push('✓ Has key: ' + data.hasApiKey)
-          } catch (err) {
-            results.push('✗ Health check: ' + err.message)
-          }
-          setTestResults([...results])
-
-          results.push('')
-          results.push('TEST 2: Direct POST...')
-          setTestResults([...results])
-          try {
-            const res = await fetch('https://llw-api-proxy.ollopiz.workers.dev', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                system: 'Reply with one word only.',
-                userMessage: 'Say: WORKING',
-                maxTokens: 10,
-              }),
-            })
-            results.push('Status: ' + res.status)
-            const text = await res.text()
-            results.push('Response: ' + text.substring(0, 150))
-          } catch (err) {
-            results.push('✗ POST failed: ' + err.message)
-          }
-          setTestResults([...results])
-
-          results.push('')
-          results.push('TEST 3: callClaude...')
-          setTestResults([...results])
-          try {
-            const proxyUrl = import.meta.env.VITE_API_PROXY_URL
-            results.push('URL: ' + (proxyUrl || 'NOT SET'))
-            setTestResults([...results])
-            const res = await fetch(proxyUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                system: 'Reply with one word only.',
-                userMessage: 'Say: WORKING',
-                maxTokens: 10,
-              }),
-            })
-            results.push('Status: ' + res.status)
-            const text = await res.text()
-            results.push('Response: ' + text.substring(0, 150))
-          } catch (err) {
-            results.push('✗ callClaude: ' + err.message)
-          }
-
-          results.push('')
-          results.push('DONE')
-          setTestResults([...results])
-          setTestRunning(false)
-        }}
-        disabled={testRunning}
-        style={{
-          background: testRunning ? '#4a5568' : '#c9a84c',
-          color: '#000',
-          border: 'none',
-          padding: '8px 16px',
-          borderRadius: '4px',
-          cursor: testRunning ? 'wait' : 'pointer',
-          fontWeight: '600',
-          width: '100%',
-          marginBottom: '12px',
-          fontFamily: 'var(--font-sans)',
-        }}
-      >
-        {testRunning ? 'Testing...' : 'Run API Test'}
-      </button>
-
-      {testResults && (
-        <div style={{
-          background: '#0f1117',
-          padding: '10px',
-          borderRadius: '4px',
-          maxHeight: '300px',
-          overflowY: 'auto',
-        }}>
-          {testResults.map((line, i) => (
-            <div key={i} style={{
-              color: line.startsWith('✓') ? '#4caf82'
-                : line.startsWith('✗') ? '#e05252'
-                : line.startsWith('TEST') ? '#c9a84c'
-                : '#e8ecf4',
-              marginBottom: '2px',
-              wordBreak: 'break-all',
-            }}>
-              {line || ' '}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
     <motion.div
       variants={pageVariants}
       initial="initial"
@@ -201,7 +69,7 @@ export default function Dashboard() {
       transition={{ duration: 0.2, ease: 'easeOut' }}
       style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px' }}>
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '24px' }}>
         {/* Left: Cases */}
         <div>
           <div style={{ marginBottom: '20px' }}>
@@ -215,11 +83,37 @@ export default function Dashboard() {
 
           {activeCases.length === 0 ? (
             <div style={{
-              textAlign: 'center', padding: '48px 24px',
+              textAlign: 'center', padding: '56px 32px',
               background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px',
-              color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic',
             }}>
-              No active matters. The firm will assign cases shortly.
+              <div style={{ fontSize: '28px', marginBottom: '16px', color: 'var(--accent-gold)' }}>⚖</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '20px', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                All matters resolved.
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px', fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
+                Outstanding work, {player.name}.
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '24px' }}>
+                New matters will be assigned shortly. Advance the day to continue.
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px',
+                maxWidth: '360px', margin: '0 auto',
+              }}>
+                {[
+                  { label: 'Cases Resolved', value: (cases.filter(c => c.status === 'closed').length) },
+                  { label: 'Total XP', value: `${(player.xp || 0).toLocaleString()} XP` },
+                  { label: 'Career Level', value: player.title },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: 'var(--bg-secondary)', borderRadius: '6px', padding: '12px',
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px', letterSpacing: '0.05em' }}>{s.label}</div>
+                    <div style={{ fontSize: '14px', color: 'var(--accent-gold)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             activeCases.map((c, i) => <CaseCard key={c.caseId} caseObject={c} index={i} />)

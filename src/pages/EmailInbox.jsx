@@ -1,13 +1,61 @@
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore.js'
 import { formatShortDate, addBusinessDays } from '../utils/dateUtils.js'
 import { callClaude } from '../api/anthropicProxy.js'
 import ComposeModal from '../components/email/ComposeModal.jsx'
 
 const PRIORITY_BORDER = {
-  urgent: 'var(--accent-red)',
-  high: 'var(--accent-gold)',
-  normal: 'transparent',
+  urgent: '4px solid var(--accent-red)',
+  high: '3px solid var(--accent-gold)',
+  normal: '3px solid transparent',
+}
+
+const FOLDERS = [
+  {
+    id: 'inbox',
+    label: 'Inbox',
+    filter: e => !e.sent && !e.archived,
+  },
+  {
+    id: 'urgent',
+    label: 'Urgent',
+    filter: e => !e.sent && !e.archived && e.priority === 'urgent',
+  },
+  {
+    id: 'from_onier',
+    label: 'From Onier',
+    filter: e => !e.sent && !e.archived && e.fromEmail === 'o.llopiz@llopizwizel.com',
+  },
+  {
+    id: 'opposing_counsel',
+    label: 'Opposing Counsel',
+    filter: e => !e.sent && !e.archived &&
+      e.fromEmail !== 'o.llopiz@llopizwizel.com' &&
+      e.fromEmail !== 'admin@llopizwizel.com',
+  },
+  {
+    id: 'sent',
+    label: 'Sent',
+    filter: e => !!e.sent,
+  },
+  {
+    id: 'firm',
+    label: 'Firm',
+    filter: e => !e.sent && !e.archived && e.fromEmail === 'admin@llopizwizel.com',
+  },
+]
+
+function prioritySort(a, b) {
+  const rank = e => {
+    if (e.read) return 3
+    if (e.priority === 'urgent') return 0
+    if (e.priority === 'high') return 1
+    return 2
+  }
+  const diff = rank(a) - rank(b)
+  if (diff !== 0) return diff
+  return new Date(b.timestamp) - new Date(a.timestamp)
 }
 
 function priorityPill(priority) {
@@ -17,9 +65,7 @@ function priorityPill(priority) {
         fontSize: '9px', background: 'var(--accent-red)', color: '#fff',
         borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
         fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
-      }}>
-        URGENT
-      </span>
+      }}>URGENT</span>
     )
   }
   if (priority === 'high') {
@@ -28,9 +74,7 @@ function priorityPill(priority) {
         fontSize: '9px', background: 'rgba(201,168,76,0.2)', color: 'var(--accent-gold)',
         borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
         fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
-      }}>
-        HIGH
-      </span>
+      }}>HIGH</span>
     )
   }
   return null
@@ -42,9 +86,7 @@ function ResponseRequiredBadge() {
       fontSize: '9px', background: 'var(--accent-red)', color: '#fff',
       borderRadius: '4px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
       fontWeight: 700, letterSpacing: '0.05em', flexShrink: 0,
-    }}>
-      RESPOND
-    </span>
+    }}>RESPOND</span>
   )
 }
 
@@ -65,8 +107,6 @@ function scheduleOpposingReply(email, replyText, attorney, deliveryDate) {
     employment_specialist: `Counsel,\n\nThank you for your letter. We note your position and will respond as appropriate under the applicable administrative and litigation framework.\n\n${sig}`,
   }
 
-  const body = STYLE_REPLIES[style] || STYLE_REPLIES.methodical
-
   return {
     id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
     timestamp: deliveryDate,
@@ -77,14 +117,13 @@ function scheduleOpposingReply(email, replyText, attorney, deliveryDate) {
     fromEmail: emailAddr,
     subject: `Re: ${email.subject}`,
     priority: attorney?.aggressiveness >= 8 ? 'high' : 'normal',
-    body,
+    body: STYLE_REPLIES[style] || STYLE_REPLIES.methodical,
   }
 }
 
 function AdversarialImpactPanel({ impact }) {
   if (!impact) return null
   const isPositive = impact.healthChange > 0
-  const isNeutral = impact.healthChange === 0
   const borderColor = isPositive ? 'rgba(74,222,128,0.3)' : impact.severity === 'critical' ? 'rgba(239,68,68,0.35)' : 'rgba(201,168,76,0.35)'
   const bgColor = isPositive ? 'rgba(74,222,128,0.06)' : impact.severity === 'critical' ? 'rgba(239,68,68,0.06)' : 'rgba(201,168,76,0.06)'
   const labelColor = isPositive ? '#4ade80' : impact.severity === 'critical' ? 'var(--accent-red)' : 'var(--accent-yellow)'
@@ -115,25 +154,20 @@ function AdversarialImpactPanel({ impact }) {
 
 export default function EmailInbox() {
   const { emails: storeEmails, cases, markEmailRead, respondToEmail, updateEmail, addPendingEmail, currentDate } = useGameStore()
+
+  const hasInitialUrgentUnread = (storeEmails || []).some(e => !e.read && !e.archived && e.priority === 'urgent')
+  const [folderId, setFolderId] = useState(hasInitialUrgentUnread ? 'urgent' : 'inbox')
   const [selected, setSelected] = useState(null)
-  const [folder, setFolder] = useState('Inbox')
   const [selectedResponseOption, setSelectedResponseOption] = useState(null)
   const [composing, setComposing] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [replyEval, setReplyEval] = useState(null)
   const [evaluating, setEvaluating] = useState(false)
 
-  const emails = [...(storeEmails || [])].sort((a, b) => {
-    // Response-required unread first
-    const aUrgent = a.requiresResponse && !a.responded && !a.responseOverdue
-    const bUrgent = b.requiresResponse && !b.responded && !b.responseOverdue
-    if (aUrgent !== bUrgent) return aUrgent ? -1 : 1
-    if (a.read !== b.read) return a.read ? 1 : -1
-    return new Date(b.timestamp) - new Date(a.timestamp)
-  })
+  const allEmails = [...(storeEmails || [])].sort(prioritySort)
 
-  const unreadCount = emails.filter(e => !e.read).length
-  const responseRequired = emails.filter(e => e.requiresResponse && !e.responded && !e.responseOverdue).length
+  const currentFolder = FOLDERS.find(f => f.id === folderId) || FOLDERS[0]
+  const folderEmails = allEmails.filter(currentFolder.filter)
 
   const handleSelect = email => {
     setSelected(email)
@@ -141,6 +175,12 @@ export default function EmailInbox() {
     setReplyText('')
     setReplyEval(null)
     if (!email.read) markEmailRead(email.id)
+  }
+
+  const handleArchive = (e, emailId) => {
+    e.stopPropagation()
+    updateEmail(emailId, { archived: true })
+    if (selectedEmail?.id === emailId) setSelected(null)
   }
 
   const handleManualReply = async () => {
@@ -163,7 +203,6 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
       const evalData = JSON.parse(clean)
       setReplyEval(evalData)
 
-      // Store eval on the email and mark responded
       updateEmail(selectedEmail.id, {
         responded: true,
         manualReply: replyText,
@@ -171,13 +210,10 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
         manualReplyDate: currentDate,
       })
 
-      // Schedule opposing attorney reply for next day if email is from opposing counsel
       const isFromOpposing = selectedEmail.from && !selectedEmail.from.includes('Llopiz') && !selectedEmail.from.includes('Santos') && !selectedEmail.from.includes('Wizel')
       if (isFromOpposing) {
         const deliveryDate = addBusinessDays(currentDate, 1)
-        // Find the opposing attorney from the email - look at from field
-        const attorney = null // will use canned style from scheduleOpposingReply defaults
-        const opposingReply = scheduleOpposingReply(selectedEmail, replyText, attorney, deliveryDate)
+        const opposingReply = scheduleOpposingReply(selectedEmail, replyText, null, deliveryDate)
         addPendingEmail(opposingReply)
       }
     } catch {
@@ -196,9 +232,7 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
     if (!selected || !selectedResponseOption) return
     const option = (selected.responseOptions || []).find(o => o.id === selectedResponseOption)
     if (!option) return
-
     respondToEmail(selected.id, option.id, option.xp || 0, option.consequence || null)
-    // Refresh selected with updated data
     setSelected(prev => ({ ...prev, responded: true, responseOptionId: option.id }))
     setSelectedResponseOption(null)
   }
@@ -218,7 +252,7 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
         <button
           onClick={() => setComposing(true)}
           style={{
-            width: '100%', height: '34px', marginBottom: '14px',
+            width: '100%', height: '34px', marginBottom: '16px',
             background: 'var(--accent-gold)', color: '#0f1117',
             border: 'none', borderRadius: '6px',
             fontFamily: 'var(--font-serif)', fontSize: '13px', fontWeight: 600,
@@ -229,54 +263,40 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
         </button>
         <div style={{
           fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em',
-          marginBottom: '12px', fontWeight: 600, fontFamily: 'var(--font-sans)',
+          marginBottom: '8px', fontWeight: 600, fontFamily: 'var(--font-sans)',
         }}>
           FOLDERS
         </div>
-        {[
-          { name: 'Inbox', count: unreadCount + responseRequired },
-          { name: 'Sent', count: 0 },
-          { name: 'Firm Announcements', count: 0 },
-        ].map(f => (
-          <button
-            key={f.name}
-            onClick={() => setFolder(f.name)}
-            style={{
-              width: '100%', textAlign: 'left',
-              background: folder === f.name ? 'rgba(201,168,76,0.1)' : 'none',
-              border: 'none',
-              color: folder === f.name ? 'var(--accent-gold)' : 'var(--text-secondary)',
-              fontSize: '13px', padding: '8px 10px', borderRadius: '6px',
-              cursor: 'pointer', marginBottom: '2px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              fontFamily: 'var(--font-sans)',
-            }}
-          >
-            <span>{f.name}</span>
-            {f.count > 0 && (
-              <span style={{
-                fontSize: '10px', background: 'var(--accent-red)', color: '#fff',
-                borderRadius: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
-              }}>
-                {f.count}
-              </span>
-            )}
-          </button>
-        ))}
-
-        {responseRequired > 0 && (
-          <div style={{
-            marginTop: '16px', padding: '8px 10px', borderRadius: '6px',
-            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-          }}>
-            <div style={{ fontSize: '10px', color: 'var(--accent-red)', fontWeight: 700, marginBottom: '2px' }}>
-              ⚠ RESPONSES DUE
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {responseRequired} email{responseRequired !== 1 ? 's' : ''} require a response
-            </div>
-          </div>
-        )}
+        {FOLDERS.map(f => {
+          const folderUnread = allEmails.filter(f.filter).filter(e => !e.read).length
+          const isSelected = folderId === f.id
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFolderId(f.id)}
+              style={{
+                width: '100%', textAlign: 'left',
+                background: isSelected ? 'rgba(201,168,76,0.1)' : 'none',
+                border: 'none',
+                color: isSelected ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                fontSize: '13px', padding: '7px 10px', borderRadius: '6px',
+                cursor: 'pointer', marginBottom: '2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                fontFamily: 'var(--font-sans)',
+              }}
+            >
+              <span>{f.label}</span>
+              {folderUnread > 0 && (
+                <span style={{
+                  fontSize: '10px', background: 'var(--accent-red)', color: '#fff',
+                  borderRadius: '10px', padding: '1px 5px', fontFamily: 'var(--font-mono)',
+                }}>
+                  {folderUnread}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Email list */}
@@ -287,58 +307,90 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
         <div style={{
           padding: '16px 16px 12px', borderBottom: '1px solid var(--border)',
           fontFamily: 'var(--font-serif)', fontSize: '16px', color: 'var(--text-primary)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          {folder}{folder === 'Inbox' && (unreadCount + responseRequired) > 0 ? ` (${unreadCount + responseRequired})` : ''}
+          <span>{currentFolder.label}</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            {folderEmails.length}
+          </span>
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {folder === 'Inbox' && emails.length === 0 && (
+          {folderEmails.length === 0 && (
             <div style={{ padding: '24px 16px', fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center' }}>
               No messages.
             </div>
           )}
-          {(folder === 'Inbox' ? emails : []).map(email => {
+          {folderEmails.map(email => {
             const isSelected = selectedEmail?.id === email.id
-            const borderColor = PRIORITY_BORDER[email.priority] || 'transparent'
             const needsResponse = email.requiresResponse && !email.responded && !email.responseOverdue
+            const borderLeft = isSelected
+              ? '3px solid var(--accent-gold)'
+              : needsResponse ? '4px solid var(--accent-red)'
+              : email.priority === 'urgent' && !email.read ? '4px solid var(--accent-red)'
+              : email.priority === 'high' && !email.read ? '3px solid var(--accent-gold)'
+              : '3px solid transparent'
+            const bg = isSelected
+              ? 'rgba(201,168,76,0.08)'
+              : email.priority === 'urgent' && !email.read ? 'rgba(239,68,68,0.05)'
+              : email.priority === 'high' && !email.read ? 'rgba(201,168,76,0.04)'
+              : email.read ? 'transparent' : 'rgba(74,158,255,0.03)'
+
             return (
               <div
                 key={email.id}
                 onClick={() => handleSelect(email)}
                 style={{
-                  padding: '12px 14px', borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer',
-                  background: isSelected
-                    ? 'rgba(201,168,76,0.08)'
-                    : needsResponse ? 'rgba(239,68,68,0.04)'
-                    : email.read ? 'transparent' : 'rgba(74,158,255,0.04)',
-                  borderLeft: isSelected
-                    ? '3px solid var(--accent-gold)'
-                    : needsResponse ? '3px solid var(--accent-red)'
-                    : `3px solid ${borderColor}`,
+                  padding: '10px 12px', borderBottom: '1px solid var(--border)',
+                  cursor: 'pointer', background: bg, borderLeft,
+                  opacity: email.read && !isSelected ? 0.72 : 1,
+                  position: 'relative',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', alignItems: 'center', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                    {!email.read && (
-                      <span style={{
+                {/* Archive button */}
+                <button
+                  onClick={e => handleArchive(e, email.id)}
+                  title="Archive"
+                  style={{
+                    position: 'absolute', top: '8px', right: '8px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: '13px', padding: '2px 5px',
+                    lineHeight: 1, borderRadius: '3px',
+                  }}
+                >
+                  ×
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                  {needsResponse ? (
+                    <motion.span
+                      animate={{ scale: [1, 1.3, 1] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                      style={{
                         width: '6px', height: '6px', borderRadius: '50%',
-                        background: needsResponse ? 'var(--accent-red)' : 'var(--accent-gold)', flexShrink: 0,
-                      }} />
-                    )}
+                        background: 'var(--accent-red)', flexShrink: 0, display: 'inline-block',
+                      }}
+                    />
+                  ) : !email.read ? (
                     <span style={{
-                      fontSize: '13px', fontWeight: email.read ? 400 : 700,
-                      color: email.read ? 'var(--text-secondary)' : 'var(--text-primary)',
-                      fontFamily: 'var(--font-sans)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {(email.from || '').split('—')[0].trim()}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      width: '6px', height: '6px', borderRadius: '50%',
+                      background: email.priority === 'urgent' ? 'var(--accent-red)' : 'var(--accent-gold)',
+                      flexShrink: 0, display: 'inline-block',
+                    }} />
+                  ) : null}
+                  <span style={{
+                    fontSize: '13px', fontWeight: email.read ? 400 : 700,
+                    color: email.read ? 'var(--text-secondary)' : 'var(--text-primary)',
+                    fontFamily: 'var(--font-sans)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                  }}>
+                    {(email.from || '').split('—')[0].trim()}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', flexShrink: 0, marginRight: '20px' }}>
                     {email.timestamp ? formatShortDate(email.timestamp) : ''}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
                   <span style={{
                     fontSize: '12px', fontWeight: email.read ? 400 : 600,
                     color: email.read ? 'var(--text-muted)' : 'var(--text-secondary)',
@@ -348,27 +400,23 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                   </span>
                   {needsResponse ? <ResponseRequiredBadge /> : priorityPill(email.priority)}
                 </div>
-                {needsResponse && (
-                  <div style={{ fontSize: '10px', color: 'var(--accent-red)', marginTop: '2px' }}>
-                    Response required within {email.responseDeadlineGameDays || 2} business day{(email.responseDeadlineGameDays || 2) !== 1 ? 's' : ''}
-                  </div>
-                )}
+
                 {!needsResponse && (
                   <div style={{
                     fontSize: '11px', color: 'var(--text-muted)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
-                    {(email.body || '').slice(0, 60)}…
+                    {(email.body || '').slice(0, 55)}…
+                  </div>
+                )}
+                {needsResponse && (
+                  <div style={{ fontSize: '10px', color: 'var(--accent-red)', marginTop: '2px' }}>
+                    Response required within {email.responseDeadlineGameDays || 2} business day{(email.responseDeadlineGameDays || 2) !== 1 ? 's' : ''}
                   </div>
                 )}
               </div>
             )
           })}
-          {folder !== 'Inbox' && (
-            <div style={{ padding: '24px 16px', fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center' }}>
-              No messages in {folder}.
-            </div>
-          )}
         </div>
       </div>
 
@@ -388,6 +436,18 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                 {selectedEmail.requiresResponse && !selectedEmail.responded && !selectedEmail.responseOverdue && (
                   <ResponseRequiredBadge />
                 )}
+                {/* Archive button in preview */}
+                <button
+                  onClick={e => handleArchive(e, selectedEmail.id)}
+                  title="Archive this email"
+                  style={{
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                    color: 'var(--text-muted)', borderRadius: '5px', cursor: 'pointer',
+                    padding: '4px 8px', fontSize: '12px',
+                  }}
+                >
+                  Archive
+                </button>
               </div>
               <div style={{
                 display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px',
@@ -420,9 +480,7 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
 
             {/* Response panel */}
             {selectedEmail.requiresResponse && !selectedEmail.responseOverdue && (
-              <div style={{
-                borderTop: '1px solid var(--border)', paddingTop: '24px',
-              }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '24px' }}>
                 {selectedEmail.responded ? (
                   <div style={{
                     padding: '12px 14px', borderRadius: '6px',
@@ -447,23 +505,20 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                     {(selectedEmail.responseOptions || []).length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                         {(selectedEmail.responseOptions || []).filter(o => o.id !== 'ignore').map(option => {
-                          const isSelected = selectedResponseOption === option.id
+                          const isOpt = selectedResponseOption === option.id
                           return (
                             <div
                               key={option.id}
                               onClick={() => setSelectedResponseOption(option.id)}
                               style={{
                                 padding: '12px 14px', borderRadius: '6px', cursor: 'pointer',
-                                border: `1.5px solid ${isSelected ? 'var(--accent-gold)' : 'var(--border)'}`,
-                                background: isSelected ? 'rgba(201,168,76,0.08)' : 'var(--bg-secondary)',
+                                border: `1.5px solid ${isOpt ? 'var(--accent-gold)' : 'var(--border)'}`,
+                                background: isOpt ? 'rgba(201,168,76,0.08)' : 'var(--bg-secondary)',
                                 transition: 'all 150ms ease',
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                <span style={{
-                                  fontSize: '13px', fontWeight: 600,
-                                  color: isSelected ? 'var(--accent-gold)' : 'var(--text-primary)',
-                                }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: isOpt ? 'var(--accent-gold)' : 'var(--text-primary)' }}>
                                   {option.label}
                                 </span>
                                 {option.xp !== 0 && (
@@ -478,11 +533,6 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                               {option.text && (
                                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5', fontStyle: 'italic' }}>
                                   "{option.text}"
-                                </div>
-                              )}
-                              {option.note && (
-                                <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--accent-green)' }}>
-                                  ✓ {option.note}
                                 </div>
                               )}
                             </div>
@@ -515,11 +565,9 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
               </div>
             )}
 
-            {/* Manual reply section — available on all emails */}
+            {/* Manual reply */}
             {selectedEmail && !selectedEmail.responded && !selectedEmail.manualReply && (
-              <div style={{
-                borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px',
-              }}>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px' }}>
                 <div style={{
                   fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '0.1em',
                   marginBottom: '10px', fontFamily: 'var(--font-mono)',
@@ -536,8 +584,7 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                     background: 'var(--bg-secondary)', border: '1px solid var(--border)',
                     borderRadius: '6px', color: 'var(--text-primary)',
                     fontFamily: 'var(--font-sans)', fontSize: '13px', lineHeight: '1.6',
-                    padding: '10px 12px', resize: 'vertical',
-                    outline: 'none',
+                    padding: '10px 12px', resize: 'vertical', outline: 'none',
                   }}
                 />
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '10px' }}>
@@ -560,12 +607,10 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
                   </span>
                 </div>
 
-                {/* Evaluation result */}
                 {replyEval && (
                   <div style={{
                     marginTop: '14px', padding: '14px 16px', borderRadius: '6px',
-                    background: replyEval.isAppropriate === false
-                      ? 'rgba(239,68,68,0.06)' : 'rgba(74,222,128,0.06)',
+                    background: replyEval.isAppropriate === false ? 'rgba(239,68,68,0.06)' : 'rgba(74,222,128,0.06)',
                     border: `1px solid ${replyEval.isAppropriate === false ? 'rgba(239,68,68,0.3)' : 'rgba(74,222,128,0.25)'}`,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -613,7 +658,6 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
               </div>
             )}
 
-            {/* Show sent manual reply */}
             {selectedEmail?.manualReply && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '20px', marginTop: '20px' }}>
                 <div style={{ fontSize: '11px', color: '#4ade80', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}>

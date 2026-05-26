@@ -26,6 +26,27 @@ function buildLossNote(caseObject, completed) {
   return `The case health deteriorated beyond the point of recovery. Review every consequence that triggered and understand why each one happened. This is how you learn. — OL`
 }
 
+function buildAdverseJudgment(caseObject) {
+  const completed = caseObject.completedActions || []
+  const cap = caseObject.hb145Applicable ? 350000 : 200000
+  const damages = Math.round(cap * (0.6 + Math.random() * 0.4))
+  return {
+    id: 'adverse_outcome',
+    outcome: 'loss',
+    color: 'var(--accent-red)',
+    label: 'Adverse Judgment — Plaintiff Prevails',
+    subtitle: 'Judgment Entered Against Client',
+    icon: '⚠',
+    xpReward: 10,
+    damages,
+    description: `The court granted plaintiff's Motion for Summary Judgment. Judgment has been entered against ${caseObject.defendant} in the amount of $${damages.toLocaleString()}.`,
+    whatWentRight: null,
+    whatWentWrong: buildWhatWentWrong(caseObject, completed),
+    oniersNote: buildLossNote(caseObject, completed),
+    notAResolution: false,
+  }
+}
+
 export function checkCaseResolution(caseObject, currentDate) {
   if (caseObject.resolved || caseObject.resolutionTriggered) return null
 
@@ -34,7 +55,10 @@ export function checkCaseResolution(caseObject, currentDate) {
   const deadlines = calculateDeadlines(caseObject)
   const daysSinceFiling = daysBetween(caseObject.dateFiled, currentDate)
 
-  const mtdQuality = caseObject.actionQualityScores?.motion_to_dismiss || 0
+  // Minimum case duration — no resolution before day 30
+  if (daysSinceFiling < 30) return null
+
+  const mtdQuality = caseObject.actionQualityScores?.motion_to_dismiss ?? 2
   const hearingDone = completed.includes('notice_mtd_hearing')
   const mtdDone = completed.includes('motion_to_dismiss')
 
@@ -110,25 +134,21 @@ export function checkCaseResolution(caseObject, currentDate) {
     }
   }
 
-  // PATH 4 — ADVERSE JUDGMENT (plaintiff MSJ granted or health collapse)
-  if (caseObject.plaintiffMSJFiled && health < 40) {
-    const cap = caseObject.hb145Applicable ? 350000 : 200000
-    const damages = Math.round(cap * (0.6 + Math.random() * 0.4))
-    return {
-      id: 'adverse_outcome',
-      outcome: 'loss',
-      color: 'var(--accent-red)',
-      label: 'Adverse Judgment — Plaintiff Prevails',
-      subtitle: 'Judgment Entered Against Client',
-      icon: '⚠',
-      xpReward: 10,
-      damages,
-      description: `The court granted plaintiff's Motion for Summary Judgment. Judgment has been entered against ${caseObject.defendant} in the amount of $${damages.toLocaleString()}.`,
-      whatWentRight: null,
-      whatWentWrong: buildWhatWentWrong(caseObject, completed),
-      oniersNote: buildLossNote(caseObject, completed),
-      notAResolution: false,
+  // PATH 4 — ADVERSE JUDGMENT (plaintiff MSJ + time gate)
+  if (caseObject.plaintiffMSJFiled) {
+    const daysSinceMSJ = caseObject.plaintiffMSJDate
+      ? daysBetween(caseObject.plaintiffMSJDate, currentDate)
+      : 0
+    if (daysSinceMSJ >= 20) {
+      const filedOpposition = completed.includes('oppose_plaintiff_msj')
+      if (!filedOpposition) {
+        return buildAdverseJudgment(caseObject)
+      } else {
+        if (health < 30) return buildAdverseJudgment(caseObject)
+        return null
+      }
     }
+    return null
   }
 
   // PATH 5 — TRIAL VERDICT (trial date passed with no resolution)

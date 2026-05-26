@@ -159,8 +159,14 @@ function MatterAssignedScreen() {
 }
 
 // ── Welcome back screen ──────────────────────────────────
-function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
+function WelcomeBack({ player, lastRealPlayedDate, onContinue, onNewGame }) {
   const [confirming, setConfirming] = useState(false)
+
+  const lastPlayedFormatted = lastRealPlayedDate
+    ? new Date(lastRealPlayedDate).toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      })
+    : null
 
   return (
     <div style={{
@@ -215,9 +221,9 @@ function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
                 New Game
               </button>
             </div>
-            {currentDate && (
+            {lastPlayedFormatted && (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                Last played: {formatGameDate(currentDate)}
+                Last played: {lastPlayedFormatted}
               </div>
             )}
           </>
@@ -265,7 +271,7 @@ function WelcomeBack({ player, currentDate, onContinue, onNewGame }) {
 
 // ── Main Onboarding ──────────────────────────────────────
 export default function Onboarding({ onReady }) {
-  const { initGame, resetGame, player, currentDate, gameStarted, staleGameCleared } = useGameStore()
+  const { initGame, resetGame, player, currentDate, lastRealPlayedDate, gameStarted, staleGameCleared } = useGameStore()
   const [name, setName] = useState('Joshy Llopiz')
   const [loadingState, setLoadingState] = useState('idle') // 'idle' | 'generating' | 'assigned'
   const [debugLog, setDebugLog] = useState([])
@@ -274,7 +280,7 @@ export default function Onboarding({ onReady }) {
     return (
       <WelcomeBack
         player={player}
-        currentDate={currentDate}
+        lastRealPlayedDate={lastRealPlayedDate}
         onContinue={() => onReady && onReady()}
         onNewGame={() => {
           resetGame()
@@ -322,9 +328,11 @@ export default function Onboarding({ onReady }) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        style={{ textAlign: 'center', marginBottom: '40px' }}
+        style={{ marginBottom: '40px' }}
       >
-        <FirmLogo size="lg" />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+          <FirmLogo size="lg" />
+        </div>
         <div style={{
           marginTop: '12px', fontSize: '14px', color: 'var(--text-secondary)',
           fontStyle: 'italic', fontFamily: 'var(--font-sans)',

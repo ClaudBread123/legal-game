@@ -539,8 +539,19 @@ We will discuss this file. Come prepared.
                 {/* CTA / status */}
                 <div style={{ paddingLeft: '16px' }}>
                   {done ? (
-                    <div style={{ fontSize: '12px', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
-                      ✓ Completed {timestamps[action.id] ? `— ${timestamps[action.id]}` : ''}
+                    <div>
+                      <div style={{ fontSize: '12px', color: 'var(--accent-green)', fontFamily: 'var(--font-mono)' }}>
+                        ✓ Completed {timestamps[action.id] ? `— ${timestamps[action.id]}` : ''}
+                      </div>
+                      {caseObject.actionQualityScores?.[action.id] != null && (
+                        <div style={{ marginTop: '3px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {'★'.repeat(caseObject.actionQualityScores[action.id])}{'☆'.repeat(3 - caseObject.actionQualityScores[action.id])}
+                          {' '}
+                          <span style={{ color: caseObject.actionQualityScores[action.id] === 3 ? '#4ade80' : caseObject.actionQualityScores[action.id] === 2 ? 'var(--accent-yellow)' : 'var(--accent-red)' }}>
+                            {caseObject.actionQualityScores[action.id] === 3 ? 'Excellent' : caseObject.actionQualityScores[action.id] === 2 ? 'Adequate' : 'Deficient'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : !isSelectedUnlocked ? (
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
