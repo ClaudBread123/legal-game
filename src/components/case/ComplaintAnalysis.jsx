@@ -7,6 +7,72 @@ import { getMPReview } from '../../api/managingPartner.js'
 import Modal from '../shared/Modal.jsx'
 import ComplaintModal from './ComplaintModal.jsx'
 
+function getIssueRelevance(issueId, caseObject) {
+  const facts = (caseObject.factScenario || '').toLowerCase()
+  const claims = (caseObject.claimsAsserted || []).join(' ').toLowerCase()
+  const caseType = caseObject.caseType || ''
+
+  const relevanceMap = {
+    barred_individual_defendant: () => {
+      const hasIndividual = facts.includes('officer') || facts.includes('employee') || facts.includes('agent') || facts.includes('deputy') || facts.includes('detective') || claims.includes('individual')
+      return hasIndividual ? { hint: `Individual employee or officer named — §768.28(9) analysis required`, relevant: true } : null
+    },
+    insufficient_presuit_notice: () => {
+      return { hint: `Pre-suit notice under §768.28(6) is required on every governmental tort claim`, relevant: true }
+    },
+    federal_removal_1983: () => {
+      const has1983 = caseType === 'section_1983' || claims.includes('1983') || claims.includes('civil rights') || facts.includes('constitutional')
+      return has1983 ? { hint: `§1983 claim detected — 30-day removal window to federal court`, relevant: true } : null
+    },
+    sovereign_immunity_bar: () => {
+      const hasDiscretionary = facts.includes('polic') || facts.includes('decision') || facts.includes('plan') || facts.includes('allocat') || facts.includes('budget')
+      return hasDiscretionary ? { hint: `Potential discretionary function — §768.28 immunity may bar this claim`, relevant: true } : null
+    },
+    statute_of_limitations: () => {
+      return { hint: `Check accrual date — §768.28(14) 2-year limitations period runs from injury`, relevant: true }
+    },
+    hb145_cap_applicability: () => {
+      const incidentDate = caseObject.dateOfIncident || ''
+      const isPostHB145 = incidentDate >= '2026-10-01'
+      return isPostHB145
+        ? { hint: `Incident on/after Oct 1, 2026 — HB 145 caps ($350k/$500k) apply`, relevant: true }
+        : { hint: `Pre-Oct 2026 incident — old §768.28(5) caps ($200k/$300k) apply`, relevant: false }
+    },
+    wrong_venue: () => {
+      const defendant = (caseObject.defendant || '').toLowerCase()
+      return { hint: `Verify filing county — §768.28(1) requires venue where claim accrued`, relevant: true }
+    },
+    admin_exhaustion: () => {
+      const isEmployment = caseType === 'employment' || claims.includes('discriminat') || claims.includes('retaliat') || claims.includes('fchr')
+      return isEmployment ? { hint: `Employment claims require FCHR/EEOC exhaustion before circuit court`, relevant: true } : null
+    },
+    duplicative_counts: () => {
+      const countCount = (caseObject.claimsAsserted || []).length
+      return countCount >= 3 ? { hint: `${countCount} counts asserted — check for duplicative theories under Fla. R. Civ. P. 1.110`, relevant: true } : null
+    },
+  }
+
+  const fn = relevanceMap[issueId]
+  return fn ? fn() : null
+}
+
+function getMissedIssueConsequence(issueId, caseObject) {
+  const defendant = caseObject.defendant || 'the governmental entity'
+  const plaintiff = caseObject.clientName || 'plaintiff'
+  const consequences = {
+    barred_individual_defendant: `Without a §768.28(9) motion, the individual defendant remains in this case, creating personal exposure and complicating the immunity defense for ${defendant}.`,
+    insufficient_presuit_notice: `If pre-suit notice was defective, ${plaintiff}'s claim against ${defendant} may be subject to dismissal — a ground that could have ended this case at the pleading stage.`,
+    federal_removal_1983: `The 30-day removal window to federal court has now passed. ${defendant} is committed to state court, losing access to qualified immunity arguments, Eleventh Amendment protections, and the federal procedural environment.`,
+    sovereign_immunity_bar: `Discretionary function immunity for ${defendant} was not raised at threshold. This defense becomes harder to assert as costs mount and discovery proceeds.`,
+    statute_of_limitations: `If ${plaintiff}'s claim against ${defendant} is time-barred, proceeding without raising this defense wastes client resources and may constitute malpractice if the limitations period has run.`,
+    hb145_cap_applicability: `Incorrect cap analysis affects the entire valuation of ${defendant}'s exposure — settlement authority, reserve setting, and case strategy all depend on applying the correct statutory cap.`,
+    wrong_venue: `A venue defect, if not raised promptly, is waived. ${defendant} may be litigating in an unfavorable county when transfer was available.`,
+    admin_exhaustion: `If ${plaintiff} failed to exhaust administrative remedies, the circuit court lacks jurisdiction. This threshold defect, if real, could end the case before any merits argument.`,
+    duplicative_counts: `Redundant counts multiply the cost of defense for ${defendant} and give ${plaintiff}'s counsel additional angles at trial. Early dismissal of duplicative theories is cost-effective.`,
+  }
+  return consequences[issueId] || null
+}
+
 function useCountUp(target, duration = 1500) {
   const [value, setValue] = useState(0)
   useEffect(() => {
@@ -236,7 +302,9 @@ export default function ComplaintAnalysis({ caseObject }) {
             ISSUE IDENTIFICATION — Select all issues present in this complaint
           </div>
           <div style={{ marginBottom: '20px' }}>
-            {ISSUE_TYPES.map(issue => (
+            {ISSUE_TYPES.map(issue => {
+              const relevance = getIssueRelevance(issue.id, caseObject)
+              return (
               <div
                 key={issue.id}
                 style={{
@@ -269,6 +337,14 @@ export default function ComplaintAnalysis({ caseObject }) {
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
                     {issue.statute}
                   </div>
+                  {relevance && (
+                    <div style={{
+                      fontSize: '11px', marginTop: '3px', fontStyle: 'italic',
+                      color: relevance.relevant ? 'rgba(76,175,130,0.85)' : 'var(--text-muted)',
+                    }}>
+                      {relevance.hint}
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={e => { e.stopPropagation(); setTooltip(tooltip === issue.id ? null : issue.id) }}
@@ -293,7 +369,8 @@ export default function ComplaintAnalysis({ caseObject }) {
                   </div>
                 )}
               </div>
-            ))}
+            )
+          })}
           </div>
           <button
             onClick={submit}
@@ -400,7 +477,7 @@ export default function ComplaintAnalysis({ caseObject }) {
                         {item.description}
                       </div>
                       <div style={{ fontSize: '12px', color: 'var(--accent-red)', fontStyle: 'italic', lineHeight: '1.5' }}>
-                        Consequence: {item.consequence}
+                        {getMissedIssueConsequence(item.issueId, caseObject) || item.consequence}
                       </div>
                     </div>
                   ))}

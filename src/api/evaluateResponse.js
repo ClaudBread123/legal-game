@@ -87,7 +87,9 @@ export async function evaluateResponse({
   const userPrompt = `Action: ${actionLabel}
 Associate career level: ${playerTitle || 'Junior Associate'}
 Grade according to the standards defined for this career level.
-Case: ${caseObject.defendant} | Incident: ${caseObject.dateOfIncident} | HB145: ${caseObject.hb145Applicable}
+Defendant (our client): ${caseObject.defendant}
+Plaintiff (adverse party): ${caseObject.clientName}
+Incident date: ${caseObject.dateOfIncident} | HB145 applies: ${caseObject.hb145Applicable}
 Claims: ${caseObject.claimsAsserted.slice(0, 3).join('; ')}
 Key issues: ${(caseObject.hiddenIssues || []).map(i => i.issueType).join(', ')}
 Facts: ${caseObject.factScenario.substring(0, 200)}
@@ -102,11 +104,11 @@ Rate the response. Return JSON:
   "qualityScore": 3,
   "xpMultiplier": 1.0,
   "confidenceScore": "HIGH",
-  "summary": "2-3 sentences on this specific response",
-  "strengths": ["specific strength"],
-  "gaps": [{"issue": "what was missed", "consequence": "real consequence", "statute": "citation or null"}],
-  "modelApproach": "what excellent looks like on this specific case in 2-3 sentences",
-  "oniersNote": "direct personal note to the associate — 1-2 sentences"
+  "summary": "2-3 sentences on this specific response, referencing ${caseObject.defendant} by name",
+  "strengths": ["specific strength tied to this case"],
+  "gaps": [{"issue": "what was missed on these facts", "consequence": "real consequence for ${caseObject.defendant}", "statute": "citation or null"}],
+  "modelApproach": "what excellent looks like on ${caseObject.defendant} — ${caseObject.dateOfIncident} in 2-3 sentences",
+  "oniersNote": "direct personal note referencing ${caseObject.defendant} by name and the incident — 1-2 sentences"
 }
 
 Quality/XP mapping:

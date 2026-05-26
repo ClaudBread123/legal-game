@@ -5,6 +5,32 @@ import { daysBetween } from '../../utils/dateUtils.js'
 import { CONSEQUENCES } from '../../utils/consequencesEngine.js'
 import StatusDot from '../shared/StatusDot.jsx'
 
+function getRecommendedNextAction(cases, currentDate) {
+  if (!currentDate) return null
+  for (const c of cases) {
+    if (c.status === 'closed' || c.resolutionTriggered) continue
+    const completed = c.completedActions || []
+    const daysSinceFiling = daysBetween(c.dateFiled, currentDate)
+
+    if (!completed.includes('pull_docket')) {
+      return { caseId: c.caseId, action: 'pull_docket', label: 'Pull Court Docket', reason: 'First action on any new file — verify all active deadlines and orders', urgency: 'high' }
+    }
+    if (!completed.includes('check_presuit_notice')) {
+      return { caseId: c.caseId, action: 'check_presuit_notice', label: 'Check Pre-Suit Notice', reason: '§768.28(6) compliance is a condition precedent — check on intake', urgency: 'high' }
+    }
+    if (!completed.includes('motion_to_dismiss') && daysSinceFiling >= 5) {
+      return { caseId: c.caseId, action: 'motion_to_dismiss', label: 'File Motion to Dismiss', reason: 'Threshold immunity defense — every governmental case requires early MTD', urgency: daysSinceFiling >= 20 ? 'critical' : 'high' }
+    }
+    if (completed.includes('motion_to_dismiss') && !completed.includes('notice_mtd_hearing')) {
+      return { caseId: c.caseId, action: 'notice_mtd_hearing', label: 'Notice MTD Hearing', reason: 'MTD is filed but hearing not set — risk of denial without adequate hearing time', urgency: 'critical' }
+    }
+    if (!completed.includes('written_discovery') && daysSinceFiling >= 10) {
+      return { caseId: c.caseId, action: 'written_discovery', label: 'Serve Written Discovery', reason: 'Interrogatories and RFAs should go out in the first 30 days', urgency: 'high' }
+    }
+  }
+  return null
+}
+
 const DEADLINE_LABELS = {
   answerDue: 'Answer / MTD Due',
   mtdHearingRecommended: 'MTD Hearing',
@@ -116,6 +142,7 @@ export default function PriorityAlerts() {
   const { cases, currentDate, notifications, markNotificationRead, emails } = useGameStore()
   const caseAlerts = computeAlerts(cases, currentDate)
   const storeAlerts = notifications.filter(n => !n.read).slice(0, 3)
+  const recommended = getRecommendedNextAction(cases, currentDate)
 
   const responseRequired = (emails || []).filter(
     e => e.requiresResponse && !e.responded && !e.responseOverdue
@@ -136,6 +163,38 @@ export default function PriorityAlerts() {
   const allEmpty = caseAlerts.length === 0 && storeAlerts.length === 0 && activeConsequenceItems.length === 0 && responseRequired === 0
 
   return (
+    <>
+    {recommended && (
+      <div
+        onClick={() => navigate(`/case/${recommended.caseId}`)}
+        style={{
+          background: 'rgba(201,168,76,0.08)', border: '1px solid var(--accent-gold)66',
+          borderLeft: '3px solid var(--accent-gold)', borderRadius: '8px',
+          padding: '14px 16px', marginBottom: '12px', cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          fontSize: '10px', color: 'var(--accent-gold)', letterSpacing: '0.1em',
+          fontWeight: 700, marginBottom: '6px',
+        }}>
+          RECOMMENDED NEXT ACTION
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600, marginBottom: '3px' }}>
+              {recommended.label}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+              {recommended.reason}
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
+              {recommended.caseId}
+            </div>
+          </div>
+          <span style={{ fontSize: '12px', color: 'var(--accent-gold)', flexShrink: 0 }}>→</span>
+        </div>
+      </div>
+    )}
     <div style={{
       background: 'var(--bg-card)',
       border: `1px solid ${allEmpty ? 'var(--border)' : 'var(--accent-red)33'}`,
@@ -287,5 +346,6 @@ export default function PriorityAlerts() {
         </>
       )}
     </div>
+    </>
   )
 }

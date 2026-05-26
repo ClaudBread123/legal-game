@@ -345,6 +345,24 @@ You MUST generate a state tort case involving a Florida city or county municipal
       if (c.status === 'closed' || c.resolutionTriggered) return c
       const resolution = checkCaseResolution(c, nextDate)
       if (!resolution) return c
+
+      // MTD probabilistic roll — store result, fire actual resolution next advance
+      if (resolution.path === 'MTD_ROLL') {
+        return {
+          ...c,
+          mtdRolled: true,
+          mtdResult: resolution.won ? 'granted' : 'denied',
+          ...(resolution.won ? {} : {
+            mtdDenied: true,
+            caseHealth: Math.max(0, (c.caseHealth ?? 100) - 15),
+            caseHealthEvents: [
+              ...(c.caseHealthEvents || []),
+              { date: nextDate, event: 'Motion to Dismiss — Court Ruling Adverse', impact: -15, type: 'consequence' },
+            ],
+          }),
+        }
+      }
+
       if (resolution.notAResolution) {
         const newHealth = Math.max(0, (c.caseHealth ?? 100) + (resolution.healthPenalty || 0))
         return {

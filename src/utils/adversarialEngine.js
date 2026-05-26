@@ -1,4 +1,5 @@
 import { daysBetween } from './dateUtils.js'
+import { applyAttorneyStyle } from '../data/emailTemplates.js'
 
 function makeId() {
   return `adv-${Date.now()}-${Math.floor(Math.random() * 100000)}`
@@ -21,6 +22,13 @@ function aggressiveDelay(attorney, baseDays) {
   const agg = attorney?.aggressiveness ?? 5
   const factor = 1 - (agg - 5) * 0.05
   return Math.max(7, Math.round(baseDays * factor))
+}
+
+// Multiplier-based delay: agg≥8 fires earlier (0.7x), agg≤4 fires later (1.4x)
+export function getEventDay(baseDay, attorney) {
+  const agg = attorney?.aggressiveness ?? 5
+  const multiplier = agg >= 8 ? 0.7 : agg <= 4 ? 1.4 : 1.0
+  return Math.max(7, Math.round(baseDay * multiplier))
 }
 
 export function runAdversarialEvents(state) {
@@ -203,52 +211,53 @@ This is the kind of error that ends careers. I am scheduling an immediate case r
     if (health < 40 && daysSinceFiling >= 60) {
       const msjKey = `plaintiff_msj_${c.caseId}`
       if (!fired.has(msjKey)) {
-        const attackDelay = aggressiveDelay(attorney, 0)
+        const attackDelay = getEventDay(0, attorney)
         if (daysSinceFiling >= 60 + attackDelay) {
-          results.newEmails.push({
-            key: msjKey,
+          const msjEmailBase = {
+            id: makeId(),
+            timestamp: currentDate,
+            read: false,
+            responded: false,
             caseId: c.caseId,
-            email: {
-              id: makeId(),
-              timestamp: currentDate,
-              read: false,
-              responded: false,
-              caseId: c.caseId,
-              from: attyName(attorney),
-              fromEmail: attyEmail(attorney),
-              subject: `Notice of Filing Motion for Summary Judgment — ${c.caseId}`,
-              priority: 'urgent',
-              body: `Counsel,
+            from: attyName(attorney),
+            fromEmail: attyEmail(attorney),
+            subject: `Notice of Filing Motion for Summary Judgment — ${c.caseId}`,
+            priority: 'urgent',
+            body: `Counsel,
 
 Please be advised that Plaintiff has this date filed a Motion for Summary Judgment in the above-referenced matter, arguing that there are no genuine issues of material fact in dispute and that judgment should be entered in Plaintiff's favor as a matter of law.
 
 Your response is due pursuant to the deadline established in the Court's Trial Order. Under Florida Rule of Civil Procedure 1.510 (as amended May 1, 2021 adopting the federal Celotex standard), summary judgment shall be granted if the movant shows there is no genuine dispute as to any material fact and the movant is entitled to judgment as a matter of law.
 
 ${attySignature(attorney)}`,
-              requiresResponse: true,
-              responseDeadlineGameDays: 5,
-              responseOptions: [
-                {
-                  id: 'oppose_msj',
-                  label: 'File opposition to MSJ',
-                  text: 'Defendant will timely file a response in opposition to Plaintiff\'s Motion for Summary Judgment demonstrating that genuine issues of material fact remain in dispute.',
-                  consequence: null,
-                  xp: 20,
-                },
-                {
-                  id: 'seek_extension',
-                  label: 'Request 30-day extension',
-                  text: 'Defendant requests a 30-day extension to respond to Plaintiff\'s Motion for Summary Judgment in order to complete necessary discovery.',
-                  consequence: null,
-                  xp: 10,
-                },
-              ],
-              adversarialImpact: {
-                healthChange: 0,
-                severity: 'urgent',
-                actionRequired: 'File opposition to plaintiff\'s MSJ within 20 days under Fla. R. Civ. P. 1.510.',
+            requiresResponse: true,
+            responseDeadlineGameDays: 5,
+            responseOptions: [
+              {
+                id: 'oppose_msj',
+                label: 'File opposition to MSJ',
+                text: 'Defendant will timely file a response in opposition to Plaintiff\'s Motion for Summary Judgment demonstrating that genuine issues of material fact remain in dispute.',
+                consequence: null,
+                xp: 20,
               },
+              {
+                id: 'seek_extension',
+                label: 'Request 30-day extension',
+                text: 'Defendant requests a 30-day extension to respond to Plaintiff\'s Motion for Summary Judgment in order to complete necessary discovery.',
+                consequence: null,
+                xp: 10,
+              },
+            ],
+            adversarialImpact: {
+              healthChange: 0,
+              severity: 'urgent',
+              actionRequired: 'File opposition to plaintiff\'s MSJ within 20 days under Fla. R. Civ. P. 1.510.',
             },
+          }
+          results.newEmails.push({
+            key: msjKey,
+            caseId: c.caseId,
+            email: applyAttorneyStyle(msjEmailBase, attorney),
           })
           results.caseUpdates[c.caseId] = {
             ...results.caseUpdates[c.caseId],
@@ -344,57 +353,58 @@ We are now committed to state court. Adjust the litigation strategy accordingly.
     }
 
     // ── 6. Settlement Demand (aggressive attorneys, 90+ days) ─
-    const settlementDelay = aggressiveDelay(attorney, 90)
+    const settlementDelay = getEventDay(90, attorney)
     if (daysSinceFiling >= settlementDelay && (attorney?.style === 'settlement_focused' || daysSinceFiling >= 110)) {
       const settleKey = `settlement_demand_${c.caseId}`
       if (!fired.has(settleKey)) {
         const demandAmount = health >= 60 ? '$50,000' : health >= 40 ? '$150,000' : '$250,000'
-        results.newEmails.push({
-          key: settleKey,
+        const settleEmailBase = {
+          id: makeId(),
+          timestamp: currentDate,
+          read: false,
+          responded: false,
           caseId: c.caseId,
-          email: {
-            id: makeId(),
-            timestamp: currentDate,
-            read: false,
-            responded: false,
-            caseId: c.caseId,
-            from: attyName(attorney),
-            fromEmail: attyEmail(attorney),
-            subject: `Settlement Demand — ${c.caseId}`,
-            priority: 'high',
-            body: `Counsel,
+          from: attyName(attorney),
+          fromEmail: attyEmail(attorney),
+          subject: `Settlement Demand — ${c.caseId}`,
+          priority: 'high',
+          body: `Counsel,
 
 On behalf of my client in the above-referenced matter, I am authorized to convey a settlement demand of ${demandAmount} inclusive of attorneys' fees and costs. This offer is open for 30 days.
 
 Please convey this demand to your client and carrier for consideration.
 
 ${attySignature(attorney)}`,
-            requiresResponse: true,
-            responseDeadlineGameDays: 7,
-            responseOptions: [
-              {
-                id: 'convey_to_client',
-                label: 'Convey to client — no position yet',
-                text: 'We acknowledge receipt of your settlement demand and will convey it to our client and carrier for evaluation. We will respond within 30 days.',
-                consequence: null,
-                xp: 10,
-              },
-              {
-                id: 'counter_offer',
-                label: 'Counter with lower offer',
-                text: 'While we have conveyed your demand to our client, the current offer significantly exceeds our client\'s assessed exposure in light of the applicable statutory caps and immunity arguments. We will propose a counter.',
-                consequence: null,
-                xp: 15,
-              },
-              {
-                id: 'reject',
-                label: 'Reject — no basis for liability',
-                text: "Our client rejects plaintiff's settlement demand. We continue to maintain that there is no basis for liability in this matter.",
-                consequence: null,
-                xp: 5,
-              },
-            ],
-          },
+          requiresResponse: true,
+          responseDeadlineGameDays: 7,
+          responseOptions: [
+            {
+              id: 'convey_to_client',
+              label: 'Convey to client — no position yet',
+              text: 'We acknowledge receipt of your settlement demand and will convey it to our client and carrier for evaluation. We will respond within 30 days.',
+              consequence: null,
+              xp: 10,
+            },
+            {
+              id: 'counter_offer',
+              label: 'Counter with lower offer',
+              text: 'While we have conveyed your demand to our client, the current offer significantly exceeds our client\'s assessed exposure in light of the applicable statutory caps and immunity arguments. We will propose a counter.',
+              consequence: null,
+              xp: 15,
+            },
+            {
+              id: 'reject',
+              label: 'Reject — no basis for liability',
+              text: "Our client rejects plaintiff's settlement demand. We continue to maintain that there is no basis for liability in this matter.",
+              consequence: null,
+              xp: 5,
+            },
+          ],
+        }
+        results.newEmails.push({
+          key: settleKey,
+          caseId: c.caseId,
+          email: applyAttorneyStyle(settleEmailBase, attorney),
         })
         results.newEventKeys.push(settleKey)
       }

@@ -1,6 +1,18 @@
 import { daysBetween } from './dateUtils.js'
 import { calculateDeadlines } from './deadlineEngine.js'
 
+function buildWhatWentRight(caseObject, completed) {
+  const items = []
+  if (completed.includes('motion_to_dismiss')) items.push('Motion to Dismiss filed asserting all available immunity grounds')
+  if (completed.includes('notice_mtd_hearing')) items.push('Hearing noticed with adequate time for full argument')
+  const mtdQ = caseObject.actionQualityScores?.motion_to_dismiss || 0
+  if (mtdQ === 3) items.push('Excellent threshold issue analysis demonstrated clear immunity grounds')
+  else if (mtdQ >= 2) items.push('Adequate immunity grounds asserted and argued')
+  if (completed.includes('written_discovery')) items.push('Written discovery served to build the defense record')
+  if (completed.includes('take_plaintiff_depo')) items.push('Plaintiff deposition taken — sworn record established')
+  return items.length > 0 ? items : ['Case management maintained adequate health for viable defense']
+}
+
 function buildWhatWentWrong(caseObject, completed) {
   const issues = []
   if (!completed.includes('motion_to_dismiss'))
@@ -62,34 +74,48 @@ export function checkCaseResolution(caseObject, currentDate) {
   const hearingDone = completed.includes('notice_mtd_hearing')
   const mtdDone = completed.includes('motion_to_dismiss')
 
-  // PATH 1 — MTD GRANTED → WIN
-  if ((mtdDone && hearingDone && mtdQuality >= 2 && daysSinceFiling >= 60 && !caseObject.mtdDenied) || caseObject.mtdGranted) {
-    const xpReward = mtdQuality === 3 ? 300 : 200
-    return {
-      id: 'dismissal_win',
-      outcome: 'strongWin',
-      color: '#4ade80',
-      label: 'Motion to Dismiss Granted',
-      subtitle: 'Case Dismissed With Prejudice',
-      icon: '⚖',
-      xpReward,
-      description: `The court granted the Motion to Dismiss in the matter of ${caseObject.clientName} v. ${caseObject.defendant}. The complaint was dismissed as legally insufficient. ${mtdQuality === 3 ? 'Excellent threshold issue analysis and proper hearing preparation led to this result.' : 'The motion was adequate. Stronger analysis could have accelerated this outcome.'}`,
-      whatWentRight: [
-        'Motion to Dismiss filed asserting all available grounds',
-        'Hearing set with adequate time for argument',
-        mtdQuality === 3 ? 'Excellent written analysis demonstrated clear immunity grounds' : 'Adequate grounds asserted and argued',
-      ],
-      whatWentWrong: null,
-      oniersNote: mtdQuality === 3
-        ? `Well done. This is exactly how threshold governmental defense works. Identify the immunity grounds early, assert them all, and set the hearing properly. The client is pleased. — OL`
-        : `The motion worked, but your analysis could have been sharper. We got the right result — review the order and understand why the court agreed. — OL`,
-      notAResolution: false,
+  // PATH 1 — MTD PROBABILISTIC RESOLUTION
+  const mtdReadyForRoll = mtdDone && hearingDone && mtdQuality >= 2 && daysSinceFiling >= 60 && !caseObject.mtdDenied
+
+  if (mtdReadyForRoll || caseObject.mtdRolled) {
+    // Already rolled — return stored result
+    if (caseObject.mtdRolled) {
+      if (caseObject.mtdResult === 'granted') {
+        const xpReward = mtdQuality === 3 ? 300 : 200
+        return {
+          path: 'MTD_GRANTED',
+          id: 'dismissal_win',
+          outcome: 'strongWin',
+          color: '#4ade80',
+          label: 'Motion to Dismiss Granted',
+          subtitle: 'Case Dismissed With Prejudice',
+          icon: '⚖',
+          xpReward,
+          description: `The court granted the Motion to Dismiss in ${caseObject.clientName} v. ${caseObject.defendant}. The complaint was dismissed as legally insufficient. ${mtdQuality === 3 ? 'Excellent threshold issue analysis and proper hearing preparation led to this result.' : 'The motion was adequate. Stronger analysis could have accelerated this outcome.'}`,
+          whatWentRight: buildWhatWentRight(caseObject, completed),
+          whatWentWrong: null,
+          oniersNote: mtdQuality === 3
+            ? `Well done. This is exactly how threshold governmental defense works on a case like ${caseObject.defendant}. Identify the immunity grounds early, assert them all, and set the hearing properly. — OL`
+            : `The motion worked. We got the right result for ${caseObject.defendant} — review the order and understand why the court agreed. Sharper analysis would have made this more certain. — OL`,
+          notAResolution: false,
+        }
+      }
+      return null // mtdResult === 'denied' — setback already applied, case continues
+    }
+
+    // First time reaching conditions — do the probabilistic roll
+    if (mtdReadyForRoll) {
+      const winProb = mtdQuality === 3 && health >= 65 ? 0.75
+        : mtdQuality >= 2 && health >= 55 ? 0.50
+        : 0.25
+      return { path: 'MTD_ROLL', won: Math.random() < winProb }
     }
   }
 
-  // PATH 2 — MTD DENIED SETBACK (not a full resolution — case continues with health penalty)
+  // PATH 2 — MTD DENIED SETBACK (no hearing set — procedural failure)
   if (mtdDone && !hearingDone && daysSinceFiling >= 45 && !caseObject.mtdDenied) {
     return {
+      path: 'MTD_DENIED',
       id: 'mtd_denied',
       outcome: 'setback',
       color: 'var(--accent-red)',

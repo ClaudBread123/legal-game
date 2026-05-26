@@ -350,3 +350,23 @@ Send the preservation letter today. Document everything you have already found b
     priority: 'high',
   }),
 }
+
+export function applyAttorneyStyle(email, attorney) {
+  if (!attorney) return email
+  const { style, aggressiveness = 5 } = attorney
+  let { body = '' } = email
+
+  if (style === 'scorched_earth' || aggressiveness >= 8) {
+    body += `\n\nPlease be advised that we intend to fully litigate all issues in this matter and are prepared to seek fees and sanctions for any improper delay or conduct. We will not be extending professional courtesies that go beyond what the Rules require.`
+  } else if (style === 'settlement_focused') {
+    body += `\n\nWe believe early resolution may serve all parties' interests in this matter and remain open to reasonable discussion at any time, without prejudice to our client's rights.`
+  } else if (style === 'civil_rights_specialist') {
+    body += `\n\nThis matter involves violations of fundamental constitutional rights. We intend to pursue all available remedies under 42 U.S.C. §1983 and applicable federal civil rights statutes vigorously.`
+  } else if (style === 'aggressive' || aggressiveness >= 7) {
+    body += `\n\nWe expect a timely response as required by the Rules of Civil Procedure.`
+  } else if (aggressiveness <= 3) {
+    body += `\n\nI am available to discuss this matter at your convenience if you believe that would be productive.`
+  }
+
+  return { ...email, body }
+}

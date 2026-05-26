@@ -1,4 +1,4 @@
-import { EMAIL_TEMPLATES } from '../data/emailTemplates.js'
+import { EMAIL_TEMPLATES, applyAttorneyStyle } from '../data/emailTemplates.js'
 import { calculateDeadlines } from './deadlineEngine.js'
 import { daysBetween } from './dateUtils.js'
 
@@ -73,15 +73,16 @@ export function checkAndGenerateEmails(state) {
 
         const oppKey = `opposing_sets_hearing_${c.caseId}`
         if (daysSinceMTD >= 14 && !alreadyFired(oppKey)) {
+          const hearingEmail = makeEmail(EMAIL_TEMPLATES.opposing_sets_hearing, {
+            opposingCounsel: c.opposingAttorney?.name || "Plaintiff's Counsel",
+            opposingEmail: c.opposingAttorney?.email || 'counsel@plaintifflaw.com',
+            caseId: c.caseId,
+            hearingDate: addCalendarDays(currentDate, 21),
+            judgeName: randomJudge(),
+          }, state)
           emails.push({
             key: oppKey,
-            email: makeEmail(EMAIL_TEMPLATES.opposing_sets_hearing, {
-              opposingCounsel: c.opposingAttorney?.name || "Plaintiff's Counsel",
-              opposingEmail: c.opposingAttorney?.email || 'counsel@plaintifflaw.com',
-              caseId: c.caseId,
-              hearingDate: addCalendarDays(currentDate, 21),
-              judgeName: randomJudge(),
-            }, state),
+            email: applyAttorneyStyle(hearingEmail, c.opposingAttorney),
           })
         }
       }
@@ -193,7 +194,7 @@ ${oppSig}`,
         key: discoveryKey,
         caseId: c.caseId,
         caseUpdates: { rfaDeadline, plaintiffDiscoveryServedDate: currentDate, plaintiffDiscoveryResponseDue: rfaDeadline, plaintiffDiscoveryResponded: false },
-        email: {
+        email: applyAttorneyStyle({
           id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
           timestamp: currentDate,
           read: false,
@@ -212,7 +213,7 @@ Pursuant to the Florida Rules of Civil Procedure, your responses are due within 
 Please govern yourself accordingly.
 
 ${oppSig2}`,
-        },
+        }, c.opposingAttorney),
       })
     }
 

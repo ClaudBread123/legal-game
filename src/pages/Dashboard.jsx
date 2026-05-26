@@ -18,7 +18,9 @@ const pageVariants = {
 export default function Dashboard() {
   const { cases, currentDate, advanceDay, pendingCaseGeneration, addGeneratedCase, addToast, player, resolutionQueue, resolveCase } = useGameStore()
   const [advancing, setAdvancing] = useState(false)
+  const [dismissedNewCaseBanners, setDismissedNewCaseBanners] = useState([])
   const activeCases = cases.filter(c => c.status !== 'closed')
+  const newCases = activeCases.filter(c => (c.completedActions || []).length === 0 && !dismissedNewCaseBanners.includes(c.caseId))
 
   const pendingResolution = resolutionQueue?.[0] || null
   const resolutionCase = pendingResolution ? cases.find(c => c.caseId === pendingResolution.caseId) : null
@@ -80,6 +82,38 @@ export default function Dashboard() {
               {activeCases.length} matter{activeCases.length !== 1 ? 's' : ''} requiring attention
             </div>
           </div>
+
+          {newCases.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{
+                background: 'rgba(201,168,76,0.08)', border: '1px solid var(--accent-gold)66',
+                borderLeft: '4px solid var(--accent-gold)', borderRadius: '8px',
+                padding: '16px 20px', marginBottom: '16px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--accent-gold)', letterSpacing: '0.1em', fontWeight: 700, marginBottom: '4px' }}>
+                  NEW MATTER ASSIGNED
+                </div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontSize: '15px', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  {newCases[0].defendant}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {newCases[0].caseId} — Begin with issue analysis and pull the docket.
+                </div>
+              </div>
+              <button
+                onClick={() => setDismissedNewCaseBanners(prev => [...prev, newCases[0].caseId])}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1, flexShrink: 0 }}
+              >
+                ×
+              </button>
+            </motion.div>
+          )}
 
           {activeCases.length === 0 ? (
             <div style={{

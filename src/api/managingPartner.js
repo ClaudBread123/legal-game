@@ -161,7 +161,9 @@ export async function getMPReview({ caseObject, issueEvaluation, completedAction
 We represent the DEFENDANT (governmental entity). The "clientName" field is the PLAINTIFF adverse to our client. Never confuse these roles.`
 
   const userMessage = `Case review for ${playerName}.
-Case: ${caseObject.caseId} — ${caseObject.defendant}
+Case: ${caseObject.caseId} — ${caseObject.defendant} (defendant/our client)
+Plaintiff (adverse party): ${caseObject.clientName}
+Incident date: ${caseObject.dateOfIncident} | HB145 applies: ${caseObject.hb145Applicable}
 Facts: ${caseObject.factScenario.substring(0, 250)}
 Case health: ${caseObject.caseHealth ?? 100}/100
 Completed actions: ${(completedActions || []).join(', ') || 'none'}
