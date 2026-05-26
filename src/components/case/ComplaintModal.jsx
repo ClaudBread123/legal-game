@@ -1,9 +1,8 @@
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export default function ComplaintModal({ caseObject, isOpen, onClose }) {
-  if (!isOpen) return null
-
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -14,9 +13,12 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
             onClick={onClose}
             style={{
               position: 'fixed',
-              inset: 0,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
               background: 'rgba(0,0,0,0.75)',
-              zIndex: 1200,
+              zIndex: 9998,
             }}
           />
 
@@ -30,9 +32,10 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              zIndex: 1201,
-              width: 'min(816px, 95vw)',
-              height: '90vh',
+              zIndex: 9999,
+              width: 'min(860px, 92vw)',
+              height: '88vh',
+              maxHeight: '88vh',
               background: '#fafaf7',
               borderRadius: '3px',
               boxShadow: '0 25px 80px rgba(0,0,0,0.7)',
@@ -45,11 +48,12 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
             <div style={{
               background: '#ede8dc',
               borderBottom: '1px solid #cfc4a8',
-              padding: '10px 20px',
+              padding: '12px 20px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               flexShrink: 0,
+              minHeight: '48px',
             }}>
               <div>
                 <span style={{
@@ -72,14 +76,15 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
               <button
                 onClick={onClose}
                 style={{
-                  background: '#d4c9a8',
-                  border: '1px solid #b8a880',
-                  color: '#4a3f2a',
-                  padding: '5px 14px',
-                  borderRadius: '3px',
+                  background: '#c9a84c',
+                  border: 'none',
+                  color: '#000',
+                  padding: '6px 16px',
+                  borderRadius: '4px',
                   cursor: 'pointer',
                   fontFamily: 'Georgia, serif',
-                  fontSize: '12px',
+                  fontSize: '13px',
+                  fontWeight: '600',
                 }}
               >
                 Close ✕
@@ -90,8 +95,10 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
             <div style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '64px 96px',
+              overflowX: 'hidden',
+              padding: '48px 72px',
               background: '#fafaf7',
+              WebkitOverflowScrolling: 'touch',
             }}>
               {caseObject?.complaintDocument ? (
                 <pre style={{
@@ -120,6 +127,7 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

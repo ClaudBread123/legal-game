@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect } from 'react'
 
@@ -9,7 +10,7 @@ export default function Modal({ isOpen, onClose, title, children, wide = false }
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -66,6 +67,7 @@ export default function Modal({ isOpen, onClose, title, children, wide = false }
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
