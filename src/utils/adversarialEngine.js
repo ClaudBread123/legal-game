@@ -222,7 +222,7 @@ This is the kind of error that ends careers. I am scheduling an immediate case r
 
 Please be advised that Plaintiff has this date filed a Motion for Summary Judgment in the above-referenced matter, arguing that there are no genuine issues of material fact in dispute and that judgment should be entered in Plaintiff's favor as a matter of law.
 
-Pursuant to Florida Rule of Civil Procedure 1.510, your response is due within twenty (20) days of service.
+Your response is due pursuant to the deadline established in the Court's Trial Order. Under Florida Rule of Civil Procedure 1.510 (as amended May 1, 2021 adopting the federal Celotex standard), summary judgment shall be granted if the movant shows there is no genuine dispute as to any material fact and the movant is entitled to judgment as a matter of law.
 
 ${attySignature(attorney)}`,
               requiresResponse: true,

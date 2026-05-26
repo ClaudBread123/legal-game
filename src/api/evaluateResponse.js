@@ -39,23 +39,59 @@ function screenResponse(playerResponse) {
   return { failed: false }
 }
 
+function buildEvaluationSystemPrompt(playerTitle) {
+  const standards = {
+    'Junior Associate': `You are grading a JUNIOR ASSOCIATE (0-2 years experience). Grade on this standard:
+EXCELLENT: Correctly identifies primary immunity grounds, cites correct Florida statute by section number, applies statute to case facts, explains the legal consequence. Does not need to be perfectly written.
+GOOD: Identifies main legal issues, cites at least one relevant statute, shows understanding of the defense theory.
+ADEQUATE: Shows basic understanding of governmental immunity concepts even if analysis is incomplete.
+POOR: Significant legal errors or misses the primary defense entirely.
+DEFICIENT: No legal analysis, nonsense, or fundamentally wrong legal theory.
+
+DO NOT penalize for: imperfect writing style, incomplete citation format, missing secondary arguments when primary argument is correct, informal tone.
+DO penalize for: wrong statute, wrong legal standard, missing the single most important defense on these facts.`,
+
+    'Associate': `You are grading an ASSOCIATE (2-4 years experience). Expect correct statute citations, application to specific facts, and identification of all major threshold issues.
+EXCELLENT: All major issues identified, correct statutes, case-specific application, strategic thinking about sequencing.
+GOOD: Primary issues identified correctly with adequate statutory support.
+ADEQUATE: Main issue identified but secondary issues missed or analysis is thin.
+POOR: Misses a major threshold issue or significant legal error.
+DEFICIENT: Fundamental misunderstanding of governmental immunity framework.`,
+
+    'Senior Associate': `You are grading a SENIOR ASSOCIATE (4-7 years). Expect comprehensive analysis, all threshold issues, strategic sequencing, and HB 145 application where relevant. Grade strictly — at this level, missing a secondary issue is ADEQUATE not GOOD.`,
+
+    'default': `You are grading a practicing Florida attorney on governmental defense analysis. Apply professional standards appropriate to their stated experience level.`,
+  }
+
+  const standard = standards[playerTitle] || standards['default']
+
+  return `You are Onier Llopiz, senior partner at Llopiz Wizel LLP, evaluating an associate's written legal analysis on a Florida governmental defense case.
+
+${standard}
+
+CRITICAL: Be fair and calibrated. Do not give DEFICIENT to an associate who correctly identified the key legal issue and cited the right statute, even if their writing is imperfect. Reserve DEFICIENT for responses that show fundamental misunderstanding or no real legal analysis.
+
+The associate represents the DEFENDANT (governmental entity). The plaintiff is the adverse party suing our client.
+
+Output ONLY valid JSON. No markdown.`
+}
+
 export async function evaluateResponse({
   caseObject, actionId, actionLabel, playerResponse, playerTitle, checkData,
 }) {
   const screen = screenResponse(playerResponse)
   if (screen.failed) return SCREENING_RESPONSES[screen.reason]
 
-  const systemPrompt = `You are Onier Llopiz, senior partner at Llopiz Wizel LLP, evaluating a junior associate's written legal analysis.
-Rate: EXCELLENT, GOOD, ADEQUATE, POOR, or DEFICIENT.
-Output ONLY valid JSON. No markdown.
-Florida law: §768.28(9) bars individual govt employees in scope of employment. §768.28(6) pre-suit notice required. HB145 (Oct 1 2026) changes caps ($350k/$500k) and notice window (18 months). §1983 removable within 30 days, uncapped.
-The associate represents the DEFENDANT (governmental entity) against the PLAINTIFF. Analysis must be from the defense perspective.`
+  const systemPrompt = buildEvaluationSystemPrompt(playerTitle)
 
   const userPrompt = `Action: ${actionLabel}
+Associate career level: ${playerTitle || 'Junior Associate'}
+Grade according to the standards defined for this career level.
 Case: ${caseObject.defendant} | Incident: ${caseObject.dateOfIncident} | HB145: ${caseObject.hb145Applicable}
 Claims: ${caseObject.claimsAsserted.slice(0, 3).join('; ')}
 Key issues: ${(caseObject.hiddenIssues || []).map(i => i.issueType).join(', ')}
 Facts: ${caseObject.factScenario.substring(0, 200)}
+Florida law context: §768.28(9) bars individual govt employees in scope. §768.28(6) pre-suit notice required. HB145 (Oct 1 2026) changes caps ($350k/$500k) and notice window (18 months). §1983 removable within 30 days, uncapped.
 
 Associate's response:
 "${playerResponse.substring(0, 500)}"

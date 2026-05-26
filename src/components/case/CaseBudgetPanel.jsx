@@ -74,6 +74,12 @@ export default function CaseBudgetPanel({ caseObject }) {
         }}>
           {TYPE_LABELS[caseObject.caseType] || caseObject.caseType}
         </span>
+        {caseObject.federalCourt && (
+          <div style={{ marginTop: '6px', padding: '3px 7px', borderRadius: '4px', background: 'rgba(74,158,255,0.15)', border: '1px solid rgba(74,158,255,0.35)', display: 'inline-block' }}>
+            <div style={{ fontSize: '9px', color: '#4a9eff', fontWeight: 700, letterSpacing: '0.1em' }}>FEDERAL COURT</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>U.S. District Court — {caseObject.federalCourtDistrict}</div>
+          </div>
+        )}
       </div>
 
       <div style={{ fontFamily: 'var(--font-serif)', fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>

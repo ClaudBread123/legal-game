@@ -82,6 +82,13 @@ export default function CaseCard({ caseObject, index = 0 }) {
             background: 'rgba(201,168,76,0.12)', color: 'var(--accent-gold)',
             fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.04em',
           }}>DEFENSE</span>
+          {caseObject.federalCourt && (
+            <span style={{
+              fontSize: '10px', padding: '2px 7px', borderRadius: '4px',
+              background: 'rgba(74,158,255,0.15)', color: '#4a9eff',
+              fontFamily: 'var(--font-mono)', fontWeight: 700,
+            }}>FEDERAL</span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
           <StatusDot status={urgency} size={7} />

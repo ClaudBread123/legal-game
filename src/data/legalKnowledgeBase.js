@@ -107,10 +107,20 @@ Relief from deemed admissions: Courts may grant relief upon a showing of good ca
 
 STRATEGIC NOTE: RFAs deemed admitted against a plaintiff can establish key elements of the defense and limit damages claims. RFAs deemed admitted against a defendant are extremely difficult to undo and can be case-dispositive.
 
-RULE 1.510 — SUMMARY JUDGMENT (FLORIDA ADOPTED FEDERAL STANDARD IN 2021)
-The court shall grant summary judgment if the movant shows that there is no genuine dispute as to any material fact and the movant is entitled to judgment as a matter of law. The court must view the evidence in the light most favorable to the nonmoving party.
+RULE 1.510 — SUMMARY JUDGMENT
+(AMENDED MAY 1, 2021 — FEDERAL STANDARD ADOPTED)
 
-NOTE: Florida amended Rule 1.510 effective May 1, 2021 to adopt the federal summary judgment standard from Celotex Corp. v. Catrett, 477 U.S. 317 (1986). This was a significant change from prior Florida law.
+Florida amended Rule 1.510 effective May 1, 2021 to adopt the federal summary judgment standard from Celotex Corp. v. Catrett, 477 U.S. 317 (1986).
+
+Current standard: The court SHALL grant summary judgment if the movant shows that there is NO GENUINE DISPUTE as to any material fact AND the movant is entitled to judgment as a matter of law.
+
+Key change from prior Florida law: The moving party need not produce evidence negating the opponent's claim — it is sufficient to show that the nonmoving party cannot produce admissible evidence to support the claim.
+
+Response deadline: Set by the Court's scheduling order / trial order. There is no fixed rule period — the deadline is established in the trial order for each case.
+
+The court must view evidence in the light most favorable to the nonmoving party.
+
+STRATEGIC NOTE: In governmental immunity cases, pure questions of law (immunity, pre-suit notice compliance, statute of limitations) are particularly strong summary judgment candidates because the court decides them — not the jury.
 
 RULE 1.310 — DEPOSITIONS
 Video depositions: If a party wishes to record a deposition by video, the notice must state that the deposition will be recorded by video AND must include the name and address of the videographer.

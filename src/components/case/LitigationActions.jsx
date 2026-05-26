@@ -31,6 +31,9 @@ const CHECK_REQUIRED_ACTIONS = new Set([
   'initial_evaluation',
   'motion_summary_judgment',
   'respond_to_discovery',
+  'file_notice_of_removal',
+  'qualified_immunity_motion',
+  'monell_analysis',
 ])
 
 function isPhaseUnlocked(phase, completedActions) {
@@ -40,8 +43,13 @@ function isPhaseUnlocked(phase, completedActions) {
   return unlocker.unlockRequires.every(id => completedActions.includes(id))
 }
 
-function isActionAvailable(action, completedActions) {
+function isActionAvailable(action, completedActions, caseObject) {
   if (action.availableWhen === 'always') return true
+  if (action.availableWhen === 'case_has_1983_claim') {
+    return (caseObject?.claimsAsserted || caseObject?.caseType === 'section_1983')
+      ? !!(caseObject?.claimsAsserted?.some(c => c.includes('1983') || c.includes('Civil Rights')) || caseObject?.caseType === 'section_1983')
+      : false
+  }
   if (action.availableWhen?.startsWith('after:')) {
     const prereq = action.availableWhen.replace('after:', '')
     return completedActions.includes(prereq)
@@ -59,7 +67,7 @@ function getPrereqLabel(action) {
 }
 
 export default function LitigationActions({ caseObject }) {
-  const { dailyActionsRemaining, completeAction, recordFailedAttempt, billTime, spendAction, addXP, logActivity, addEmail, player } = useGameStore()
+  const { dailyActionsRemaining, completeAction, recordFailedAttempt, billTime, spendAction, addXP, logActivity, addEmail, updateCase, removeToFederalCourt, player } = useGameStore()
   const [selectedPhaseId, setSelectedPhaseId] = useState('phase_1')
   const [modalAction, setModalAction] = useState(null)
   const [specialModal, setSpecialModal] = useState(null)
@@ -75,6 +83,7 @@ export default function LitigationActions({ caseObject }) {
     action: null,
     checkData: null,
   })
+  const [depWarning, setDepWarning] = useState(null)
 
   const completed = caseObject.completedActions || []
   const timestamps = caseObject.actionTimestamps || {}
@@ -84,6 +93,12 @@ export default function LitigationActions({ caseObject }) {
   const isSelectedUnlocked = isPhaseUnlocked(selectedPhase, completed)
   const phaseCompletedCount = selectedPhase.actions.filter(a => completed.includes(a.id)).length
   const nextPhase = LITIGATION_PHASES.find(p => p.id === selectedPhase.unlocksPhase)
+
+  const dispatchOnComplete = (action) => {
+    if (action.onComplete === 'removeToFederalCourt') {
+      removeToFederalCourt(caseObject.caseId)
+    }
+  }
 
   const handleConfirm = () => {
     if (!modalAction) return
@@ -95,9 +110,28 @@ export default function LitigationActions({ caseObject }) {
     spendAction(action.dailyActionCost)
     addXP(action.xpReward, `${action.label} on ${caseObject.caseId}`)
     logActivity(`Action taken: ${action.label} (${caseObject.caseId})`, 'action')
+    dispatchOnComplete(action)
 
     setCelebrateId(action.id)
     setTimeout(() => setCelebrateId(null), 1500)
+  }
+
+  const handleActionClick = (action) => {
+    if (action.warningIfSkipped) {
+      const missingPrereqs = (action.warningIfSkipped.prerequisiteActions || []).filter(id => !completed.includes(id))
+      if (missingPrereqs.length > 0) {
+        setDepWarning({ action, missingPrereqs })
+        return
+      }
+    }
+    proceedWithAction(action)
+  }
+
+  const proceedWithAction = (action) => {
+    const specialType = SPECIAL_MODAL_TYPES[action.id]
+    if (specialType) setSpecialModal({ action, type: specialType })
+    else if (CHECK_REQUIRED_ACTIONS.has(action.id)) openComprehensionCheck(action)
+    else setModalAction(action)
   }
 
   const openComprehensionCheck = async (action) => {
@@ -150,6 +184,7 @@ export default function LitigationActions({ caseObject }) {
     const earnedXP = Math.round(action.xpReward * xpMultiplier)
     addXP(earnedXP, `${action.label} — Quality ${qualityScore === 3 ? 'Excellent' : qualityScore === 2 ? 'Adequate' : 'Deficient'} (${caseObject.caseId})`)
     logActivity(`Action taken: ${action.label} (${caseObject.caseId}) — Quality ${qualityScore}`, 'action')
+    dispatchOnComplete(action)
 
     if (qualityScore === 1) {
       addEmail({
@@ -390,14 +425,29 @@ We will discuss this file. Come prepared.
           )}
 
           {/* Actions grid — in Phase 4, exclude the wizard-handled actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
-          {(selectedPhaseId === 'phase_4'
-            ? selectedPhase.actions.filter(a => !EXPERT_WIZARD_ACTION_IDS.has(a.id))
-            : selectedPhase.actions
-          ).map(action => {
+          {(() => {
+            const rawActions = (selectedPhaseId === 'phase_4'
+              ? selectedPhase.actions.filter(a => !EXPERT_WIZARD_ACTION_IDS.has(a.id))
+              : selectedPhase.actions
+            )
+            // Filter: federalOnly hidden unless federalCourt === true
+            // case_has_1983_claim: hidden unless case qualifies
+            const visibleActions = rawActions.filter(a => {
+              if (a.federalOnly && !caseObject.federalCourt) return false
+              if (a.availableWhen === 'case_has_1983_claim') {
+                const has1983 = caseObject?.caseType === 'section_1983' ||
+                  (caseObject?.claimsAsserted || []).some(c => c.includes('1983') || c.includes('Civil Rights'))
+                return has1983
+              }
+              return true
+            })
+            const normalActions = visibleActions.filter(a => !a.federalOnly)
+            const federalActions = visibleActions.filter(a => a.federalOnly)
+
+            const renderActionCard = (action) => {
             const done = completed.includes(action.id)
             const isLocked = lockedActionIds.has(action.id)
-            const actionAvailable = isSelectedUnlocked && isActionAvailable(action, completed)
+            const actionAvailable = isSelectedUnlocked && isActionAvailable(action, completed, caseObject)
             const canAct = actionAvailable && !done && !isLocked && dailyActionsRemaining >= action.dailyActionCost
             const prereqLabel = isSelectedUnlocked && !done && !actionAvailable ? getPrereqLabel(action) : null
 
@@ -506,15 +556,10 @@ We will discuss this file. Come prepared.
                     </div>
                   ) : (
                     <button
-                      onClick={() => {
-                        const specialType = SPECIAL_MODAL_TYPES[action.id]
-                        if (specialType) setSpecialModal({ action, type: specialType })
-                        else if (CHECK_REQUIRED_ACTIONS.has(action.id)) openComprehensionCheck(action)
-                        else setModalAction(action)
-                      }}
+                      onClick={() => handleActionClick(action)}
                       disabled={!canAct}
                       style={{
-                        background: canAct ? selectedPhase.color : 'var(--border)',
+                        background: canAct ? (action.federalOnly ? 'var(--accent-blue)' : selectedPhase.color) : 'var(--border)',
                         color: canAct ? '#0f1117' : 'var(--text-muted)',
                         border: 'none', borderRadius: '6px',
                         padding: '8px 16px', fontSize: '13px',
@@ -529,8 +574,38 @@ We will discuss this file. Come prepared.
                 </div>
               </div>
             )
-          })}
-          </div>
+            }
+
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                  {normalActions.map(renderActionCard)}
+                </div>
+                {federalActions.length > 0 && (
+                  <>
+                    <div style={{
+                      marginTop: '22px', marginBottom: '12px',
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                    }}>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(74,158,255,0.25)' }} />
+                      <div style={{
+                        fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em',
+                        color: 'var(--accent-blue)', fontFamily: 'var(--font-mono)',
+                        padding: '3px 10px', border: '1px solid rgba(74,158,255,0.3)',
+                        borderRadius: '4px', background: 'rgba(74,158,255,0.06)',
+                      }}>
+                        FEDERAL COURT ACTIONS
+                      </div>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(74,158,255,0.25)' }} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                      {federalActions.map(renderActionCard)}
+                    </div>
+                  </>
+                )}
+              </>
+            )
+          })()}
         </>
       )}
 
@@ -605,6 +680,71 @@ We will discuss this file. Come prepared.
         isLoading={checkModal.isLoading}
         checkData={checkModal.checkData}
       />
+
+      {/* Dependency warning modal */}
+      <Modal isOpen={!!depWarning} onClose={() => setDepWarning(null)} title="Prerequisite Actions Incomplete">
+        {depWarning && (
+          <div>
+            <div style={{
+              padding: '14px', background: 'rgba(255,193,7,0.08)',
+              border: '1px solid rgba(255,193,7,0.3)', borderRadius: '7px', marginBottom: '16px',
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-yellow)', marginBottom: '8px' }}>
+                ⚠ {depWarning.action.warningIfSkipped.warning}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                Missing prerequisites:
+              </div>
+              {depWarning.missingPrereqs.map(id => {
+                const prereqAction = LITIGATION_ACTIONS.find(a => a.id === id)
+                return (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--accent-red)' }}>✗</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      {prereqAction?.label || id}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setDepWarning(null)}
+                style={{
+                  flex: 1.4, height: '42px', background: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)', border: '1px solid var(--border)',
+                  borderRadius: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                Go Back — Complete Prerequisites First
+              </button>
+              <button
+                onClick={() => {
+                  const action = depWarning.action
+                  setDepWarning(null)
+                  const currentHealth = (caseObject.caseHealth ?? 100)
+                  updateCase(caseObject.caseId, {
+                    caseHealth: Math.max(0, currentHealth - 3),
+                    caseHealthEvents: [
+                      ...(caseObject.caseHealthEvents || []),
+                      { date: new Date().toISOString().slice(0,10), event: `Skipped prerequisites for ${action.label}`, impact: -3, type: 'consequence' },
+                    ],
+                  })
+                  logActivity(`${caseObject.caseId}: Proceeded with ${action.label} despite missing prerequisites`, 'warning')
+                  proceedWithAction(action)
+                }}
+                style={{
+                  flex: 1, height: '42px', background: 'rgba(255,193,7,0.15)',
+                  color: 'var(--accent-yellow)', border: '1px solid rgba(255,193,7,0.35)',
+                  borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
+                }}
+              >
+                Proceed Anyway — Accept the Risk
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Confirm modal */}
       <Modal isOpen={!!modalAction} onClose={() => setModalAction(null)} title={modalAction?.label}>

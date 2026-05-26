@@ -475,4 +475,122 @@ export const FALLBACK_CHECKS = {
     },
   ],
 
+
+  file_notice_of_removal: [
+    {
+      actionContext: 'The 30-day removal deadline under 28 U.S.C. §1446(b) is jurisdictional and cannot be extended. When a complaint contains §1983 claims, immediate evaluation of federal removal is required.',
+      keyStatutes: ['28 U.S.C. §1441', '28 U.S.C. §1446(b)', '42 U.S.C. §1983'],
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'The complaint against [DEFENDANT] contains claims under 42 U.S.C. §1983. The 30-day removal deadline is approaching. Which statement BEST describes your obligation?',
+          options: {
+            A: 'You may remove at any time — there is no deadline for §1983 cases',
+            B: 'The Notice of Removal must be filed within 30 days of service of the initial pleading — this deadline is jurisdictional and cannot be extended under any circumstances',
+            C: 'You may file a motion to extend the removal deadline if you need more time to evaluate the case',
+            D: 'Removal is only available after the state court rules on a motion to dismiss',
+          },
+          correctAnswer: 'B',
+          explanation: 'Under 28 U.S.C. §1446(b), the Notice of Removal must be filed within 30 days after receipt of the initial pleading setting forth the claim. This deadline is strictly enforced and jurisdictional — courts have no discretion to extend it. Missing the window permanently waives the right to remove. Federal court provides significant strategic advantages in §1983 cases: qualified immunity, Eleventh Amendment analysis, and a more favorable procedural environment.',
+          statute: '28 U.S.C. §1446(b)',
+          xpValue: 40,
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: '[DEFENDANT] is a Florida municipality. The complaint names an individual officer under §1983. In federal court, which defense is available to the individual officer that is NOT available in Florida state court?',
+          options: {
+            A: 'Sovereign immunity under §768.28',
+            B: 'Qualified immunity under Harlow v. Fitzgerald — shields officials unless they violated clearly established law a reasonable person would have known',
+            C: 'Statute of limitations defense',
+            D: 'Pre-suit notice under §768.28(6)',
+          },
+          correctAnswer: 'B',
+          explanation: 'Qualified immunity under Harlow v. Fitzgerald, 457 U.S. 800 (1982), is a federal doctrine available only in federal §1983 litigation. It protects government officials from personal liability unless their conduct violated "clearly established" statutory or constitutional rights of which a reasonable person would have known. Florida\'s §768.28(9) provides similar but distinct protection for in-scope conduct in state court. After removal, qualified immunity is immediately available and should be raised in the first motion.',
+          statute: 'Harlow v. Fitzgerald, 457 U.S. 800 (1982)',
+          xpValue: 35,
+        },
+      ],
+      qualityRubric: {
+        excellent: '30-day deadline correctly identified, federal advantages for §1983 articulated, QI and Monell framework understood',
+        adequate: 'Deadline identified, removal mechanism understood',
+        deficient: 'Missed jurisdictional nature of deadline or confused removal with other procedures',
+      },
+    },
+  ],
+
+  qualified_immunity_motion: [
+    {
+      actionContext: 'Qualified immunity is the primary individual defendant defense in federal §1983 litigation. It protects officials from liability unless they violated clearly established law.',
+      keyStatutes: ['42 U.S.C. §1983', 'Harlow v. Fitzgerald, 457 U.S. 800 (1982)', '28 U.S.C. §1441'],
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: '[DEFENDANT] has removed this §1983 case to federal court. Under the qualified immunity doctrine established in Harlow v. Fitzgerald, a government official is immune from §1983 liability UNLESS:',
+          options: {
+            A: 'The official caused any injury to the plaintiff regardless of intent',
+            B: 'The official violated a clearly established statutory or constitutional right of which a reasonable person would have known at the time of the conduct',
+            C: 'The official acted outside the scope of their employment',
+            D: "The governmental entity approved the official's specific action in writing beforehand",
+          },
+          correctAnswer: 'B',
+          explanation: 'Harlow v. Fitzgerald (1982) established the objective qualified immunity standard: officials are shielded unless their conduct violates clearly established statutory or constitutional rights of which a reasonable person would have known. The test is objective — not whether the official subjectively knew they were violating the law. This is a powerful defense because it requires plaintiff to identify a prior case with nearly identical facts establishing the right was "clearly established."',
+          statute: 'Harlow v. Fitzgerald, 457 U.S. 800',
+          xpValue: 50,
+        },
+        {
+          id: 'q2',
+          type: 'multiple_choice',
+          question: 'For [DEFENDANT] to face §1983 liability as a municipality (not just individual officers), plaintiff must satisfy the Monell standard. This requires plaintiff to prove:',
+          options: {
+            A: "Any employee of the municipality violated plaintiff's constitutional rights during working hours",
+            B: 'The municipality had adequate insurance to cover the claim',
+            C: "A constitutional violation resulted from an official policy, widespread custom, or deliberate indifference to a known risk — a single incident is generally insufficient",
+            D: "The municipality received prior written notice of the specific employee's dangerous propensities",
+          },
+          correctAnswer: 'C',
+          explanation: 'Monell v. Dept of Social Services (1978) held that municipalities are not vicariously liable under §1983 for their employees\' constitutional violations. Plaintiff must show the violation resulted from: (1) an express official policy, (2) a widespread unofficial custom, or (3) deliberate indifference to a known pattern of violations. A single incident by a single employee is almost never enough to establish Monell liability — this is your strongest argument against municipal liability in §1983 cases.',
+          statute: 'Monell v. Dept of Social Services, 436 U.S. 658',
+          xpValue: 50,
+        },
+      ],
+      qualityRubric: {
+        excellent: 'Both Harlow QI standard and Monell municipal liability standard correctly identified and applied',
+        adequate: 'QI standard identified, Monell partially understood',
+        deficient: 'Confused QI with state immunity or missed Monell entirely',
+      },
+    },
+  ],
+
+  monell_analysis: [
+    {
+      actionContext: 'Monell analysis is the threshold question in any municipal §1983 case. Without a viable Monell theory, the municipality cannot be held liable even if an individual employee violated plaintiff\'s rights.',
+      keyStatutes: ['Monell v. Dept of Social Services, 436 U.S. 658 (1978)', '42 U.S.C. §1983'],
+      questions: [
+        {
+          id: 'q1',
+          type: 'multiple_choice',
+          question: 'Plaintiff claims [DEFENDANT] is liable under §1983 based on a single incident where one officer allegedly violated plaintiff\'s constitutional rights. Under Monell, this claim:',
+          options: {
+            A: 'Succeeds automatically because the officer was on duty',
+            B: 'Fails — a single incident is generally insufficient to establish municipal liability; plaintiff must show an official policy, widespread custom, or deliberate indifference',
+            C: 'Succeeds if the officer was acting within scope of employment',
+            D: 'Requires the municipality to prove it had no knowledge of the officer\'s actions',
+          },
+          correctAnswer: 'B',
+          explanation: 'Under Monell, municipalities cannot be held vicariously liable under §1983 — there is no respondeat superior liability. A single incident by a single officer, without more, cannot establish the required policy or custom. Plaintiff must show: (1) an express official policy, (2) a widespread unofficial custom that the municipality was deliberately indifferent to, or (3) that a final policymaker ratified the unconstitutional action. The single-incident rule is your most powerful defensive argument on Monell in most cases.',
+          statute: 'Monell v. Dept of Social Services, 436 U.S. 658',
+          xpValue: 50,
+        },
+      ],
+      qualityRubric: {
+        excellent: 'Single-incident rule, policy/custom/deliberate indifference correctly analyzed, no respondeat superior under §1983',
+        adequate: 'Monell framework understood, no respondeat superior noted',
+        deficient: 'Applied respondeat superior or missed Monell entirely',
+      },
+    },
+  ],
+
 }
