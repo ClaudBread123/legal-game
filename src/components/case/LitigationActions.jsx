@@ -349,6 +349,28 @@ We will discuss this file. Come prepared.
         )}
       </div>
 
+      {/* Discovery response urgency banner */}
+      {caseObject.rfaDeadline && !completed.includes('respond_to_discovery') && (
+        <div style={{
+          marginBottom: '16px', padding: '12px 16px', borderRadius: '6px',
+          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)',
+          display: 'flex', alignItems: 'flex-start', gap: '10px',
+        }}>
+          <span style={{ fontSize: '15px', flexShrink: 0, marginTop: '1px' }}>⚠</span>
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent-red)', letterSpacing: '0.05em', marginBottom: '3px' }}>
+              DISCOVERY RESPONSE DEADLINE ACTIVE
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              Plaintiff's RFAs, Interrogatories, and Request for Production are due by {caseObject.rfaDeadline}. Failure to respond results in RFAs being deemed admitted under Rule 1.370.
+            </div>
+            <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--accent-red)', fontFamily: 'var(--font-mono)' }}>
+              → Complete "Respond to Discovery" in Phase 3 immediately.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Day complete banner */}
       {dailyActionsRemaining === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px' }}>

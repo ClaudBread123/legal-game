@@ -16,7 +16,7 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
               position: 'fixed',
               inset: 0,
               background: 'rgba(0,0,0,0.75)',
-              zIndex: 900,
+              zIndex: 1200,
             }}
           />
 
@@ -30,7 +30,7 @@ export default function ComplaintModal({ caseObject, isOpen, onClose }) {
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              zIndex: 901,
+              zIndex: 1201,
               width: 'min(816px, 95vw)',
               height: '90vh',
               background: '#fafaf7',

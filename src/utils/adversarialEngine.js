@@ -60,7 +60,6 @@ export function runAdversarialEvents(state) {
 
         // Grant: hearing set, quality ≥ 2, 35+ days
         if (hearingSet && mtdQuality >= 2 && daysSinceMTD >= 35 && !fired.has(grantKey)) {
-          const xpReward = mtdQuality === 3 ? 300 : 150
           results.newEmails.push({
             key: grantKey,
             caseId: c.caseId,
@@ -85,6 +84,11 @@ The case will be dismissed with prejudice. Onier Llopiz will contact the client 
 Well done.
 
 — OL`,
+              adversarialImpact: {
+                healthChange: 25,
+                severity: 'positive',
+                actionRequired: null,
+              },
             },
           })
           results.caseUpdates[c.caseId] = {
@@ -92,19 +96,6 @@ Well done.
             caseHealth: Math.min(100, health + 25),
             mtdGranted: true,
           }
-          results.newResolutionItems.push({
-            caseId: c.caseId,
-            resolutionPath: {
-              id: 'dismissal_win',
-              label: 'Dismissed With Prejudice',
-              subtitle: 'Motion to Dismiss Granted',
-              description: 'Your motion to dismiss was granted. The court found the complaint failed to state a claim upon which relief could be granted, and the matter has been dismissed with prejudice.',
-              outcome: 'strongWin',
-              icon: '⚖',
-              color: '#4ade80',
-              xpReward,
-            },
-          })
           results.newNotifications.push({
             id: `mtd-granted-${Date.now()}`,
             message: `${c.caseId}: Motion to Dismiss GRANTED — case resolved!`,
@@ -142,6 +133,11 @@ The grounds are not entirely lost — some can be raised at summary judgment. Bu
 Case health is compromised. I need a revised litigation plan immediately.
 
 — OL`,
+              adversarialImpact: {
+                healthChange: -20,
+                severity: 'critical',
+                actionRequired: 'Immunity grounds can still be raised at summary judgment — begin discovery immediately.',
+              },
             },
           })
           results.caseUpdates[c.caseId] = {
@@ -180,6 +176,11 @@ Do you understand what this means? Plaintiff has now established — by our own 
 This is the kind of error that ends careers. I am scheduling an immediate case review.
 
 — OL`,
+            adversarialImpact: {
+              healthChange: -30,
+              severity: 'critical',
+              actionRequired: 'File motion for relief from admissions under Rule 1.370 — requires showing of good cause.',
+            },
           },
         })
         results.caseUpdates[c.caseId] = {
@@ -242,6 +243,11 @@ ${attySignature(attorney)}`,
                   xp: 10,
                 },
               ],
+              adversarialImpact: {
+                healthChange: 0,
+                severity: 'urgent',
+                actionRequired: 'File opposition to plaintiff\'s MSJ within 20 days under Fla. R. Civ. P. 1.510.',
+              },
             },
           })
           results.caseUpdates[c.caseId] = {
@@ -288,6 +294,11 @@ Without expert testimony, proceeding to summary judgment or trial in this type o
 I need to meet with you today. This must be reported to the client immediately.
 
 — OL`,
+            adversarialImpact: {
+              healthChange: -25,
+              severity: 'critical',
+              actionRequired: 'Explore late expert retention — court must grant leave; show excusable neglect.',
+            },
           },
         })
         results.caseUpdates[c.caseId] = {

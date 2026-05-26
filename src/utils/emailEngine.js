@@ -192,7 +192,7 @@ ${oppSig}`,
       emails.push({
         key: discoveryKey,
         caseId: c.caseId,
-        caseUpdates: { rfaDeadline },
+        caseUpdates: { rfaDeadline, plaintiffDiscoveryServedDate: currentDate, plaintiffDiscoveryResponseDue: rfaDeadline, plaintiffDiscoveryResponded: false },
         email: {
           id: `email-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
           timestamp: currentDate,

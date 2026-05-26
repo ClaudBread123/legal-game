@@ -6,7 +6,7 @@ import ComplaintModal from './ComplaintModal.jsx'
 
 const INSTRUCTIONS = {
   motion_to_dismiss: (c) =>
-    `You are preparing a Motion to Dismiss in the matter of ${c.clientName} v. ${c.defendant}.\n\nReview the complaint above and provide your analysis: What grounds will you assert? Why does each ground apply to these specific facts? What is your strategic priority among the grounds?\n\nReference specific Florida statutes. Consider the incident date and applicable law. There is no single right answer — demonstrate your legal reasoning.`,
+    `You are defense counsel for ${c.defendant} in the matter of ${c.clientName} v. ${c.defendant}. ${c.clientName} is the plaintiff — the adverse party. Your client is ${c.defendant}.\n\nYou are preparing a Motion to Dismiss. Identify and analyze all available grounds: governmental immunity under §768.28(9), pre-suit notice defects under §768.28(6), statute of limitations, §1983 removal if applicable, and any other threshold defenses specific to these facts.\n\nFor each ground: state the legal basis, explain why it applies to these specific facts, and assess your likelihood of success. Reference the specific statutes. There is no single right answer — demonstrate your legal reasoning.`,
   initial_evaluation: (c) =>
     `You are preparing the initial liability evaluation for ${c.defendant} in the matter of ${c.clientName} v. ${c.defendant}.\n\nAssess: What is the realistic liability exposure? Which defenses are strongest? What are the weaknesses? What is the applicable damages cap under §768.28(5) and why? What is your recommended strategy?\n\nBe honest about exposure. Cite specific statutes. This report goes to the client and carrier.`,
 }

@@ -8,6 +8,7 @@ const DEADLINE_LABELS = {
   answerDue: 'Answer / MTD Due',
   mtdHearingRecommended: 'MTD Hearing (Rec.)',
   removalDeadline: 'Removal Deadline',
+  respondToPlaintiffDiscovery: "Respond to Pltf. Discovery",
   plaintiffExpertDisclosure: "Plaintiff's Expert Disc.",
   defendantExpertDisclosure: "Defendant's Expert Disc.",
   discoveryCloses: 'Discovery Closes',

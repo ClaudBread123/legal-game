@@ -81,8 +81,40 @@ function scheduleOpposingReply(email, replyText, attorney, deliveryDate) {
   }
 }
 
+function AdversarialImpactPanel({ impact }) {
+  if (!impact) return null
+  const isPositive = impact.healthChange > 0
+  const isNeutral = impact.healthChange === 0
+  const borderColor = isPositive ? 'rgba(74,222,128,0.3)' : impact.severity === 'critical' ? 'rgba(239,68,68,0.35)' : 'rgba(201,168,76,0.35)'
+  const bgColor = isPositive ? 'rgba(74,222,128,0.06)' : impact.severity === 'critical' ? 'rgba(239,68,68,0.06)' : 'rgba(201,168,76,0.06)'
+  const labelColor = isPositive ? '#4ade80' : impact.severity === 'critical' ? 'var(--accent-red)' : 'var(--accent-yellow)'
+  return (
+    <div style={{
+      marginTop: '16px', padding: '12px 16px', borderRadius: '6px',
+      background: bgColor, border: `1px solid ${borderColor}`,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+        <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', fontWeight: 700, color: labelColor }}>
+          {isPositive ? 'CASE IMPACT — POSITIVE' : impact.severity === 'critical' ? 'CASE IMPACT — CRITICAL' : 'CASE IMPACT — ACTION REQUIRED'}
+        </div>
+        {impact.healthChange !== 0 && (
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 700, color: labelColor }}>
+            {isPositive ? '+' : ''}{impact.healthChange} Case Health
+          </div>
+        )}
+      </div>
+      {impact.actionRequired && (
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+          <span style={{ color: labelColor, fontWeight: 600 }}>Action required: </span>
+          {impact.actionRequired}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function EmailInbox() {
-  const { emails: storeEmails, markEmailRead, respondToEmail, updateEmail, addPendingEmail, currentDate } = useGameStore()
+  const { emails: storeEmails, cases, markEmailRead, respondToEmail, updateEmail, addPendingEmail, currentDate } = useGameStore()
   const [selected, setSelected] = useState(null)
   const [folder, setFolder] = useState('Inbox')
   const [selectedResponseOption, setSelectedResponseOption] = useState(null)
@@ -383,6 +415,8 @@ Evaluate this reply for professionalism, appropriateness for Florida legal pract
             }}>
               {selectedEmail.body}
             </div>
+
+            <AdversarialImpactPanel impact={selectedEmail.adversarialImpact} />
 
             {/* Response panel */}
             {selectedEmail.requiresResponse && !selectedEmail.responseOverdue && (

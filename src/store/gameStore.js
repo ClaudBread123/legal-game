@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { getNextFallbackCase } from '../data/fallbackCases.js'
 import { generateCase, generateComplaintDocument } from '../api/caseGenerator.js'
-import { shouldTriggerResolution, determineResolutionPath } from '../utils/caseResolution.js'
+import { checkCaseResolution, shouldTriggerResolution, determineResolutionPath } from '../utils/caseResolution.js'
 import { getSimulatedStartDate, advanceBusinessDay, daysBetween } from '../utils/dateUtils.js'
 import { checkAndGenerateEmails } from '../utils/emailEngine.js'
 import { evaluateConsequences } from '../utils/consequencesEngine.js'
@@ -340,21 +340,24 @@ You MUST generate a state tort case involving a Florida city or county municipal
     })
 
     const pendingResolutions = []
-    // Add adversarial resolution items (e.g., MTD granted by court)
-    for (const item of adversarialResults.newResolutionItems || []) {
-      pendingResolutions.push({ caseId: item.caseId, resolutionPath: item.resolutionPath })
-      activeCases = activeCases.map(c =>
-        c.caseId === item.caseId ? { ...c, resolutionTriggered: true } : c
-      )
-    }
     activeCases = activeCases.map(c => {
       if (c.status === 'closed' || c.resolutionTriggered) return c
-      if (shouldTriggerResolution(c, nextDate)) {
-        const resolutionPath = determineResolutionPath(c)
-        pendingResolutions.push({ caseId: c.caseId, resolutionPath })
-        return { ...c, resolutionTriggered: true }
+      const resolution = checkCaseResolution(c, nextDate)
+      if (!resolution) return c
+      if (resolution.notAResolution) {
+        const newHealth = Math.max(0, (c.caseHealth ?? 100) + (resolution.healthPenalty || 0))
+        return {
+          ...c,
+          caseHealth: newHealth,
+          mtdDenied: true,
+          caseHealthEvents: [
+            ...(c.caseHealthEvents || []),
+            { date: nextDate, event: resolution.label, impact: resolution.healthPenalty || 0, type: 'consequence' },
+          ],
+        }
       }
-      return c
+      pendingResolutions.push({ caseId: c.caseId, resolutionPath: resolution })
+      return { ...c, resolutionTriggered: true }
     })
 
     const overdueResponseEmails = []
