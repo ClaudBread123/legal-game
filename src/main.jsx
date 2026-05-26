@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion'
 import { useGameStore } from './store/gameStore.js'
 import AppShell from './components/layout/AppShell.jsx'
 import Onboarding from './pages/Onboarding.jsx'
+import PasswordGate from './pages/PasswordGate.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import CaseView from './pages/CaseView.jsx'
 import Career from './pages/Career.jsx'
@@ -29,8 +30,12 @@ function AnimatedRoutes() {
 }
 
 function Root() {
-  const { gameStarted } = useGameStore()
+  const { gameStarted, authenticated } = useGameStore()
   const [sessionReady, setSessionReady] = useState(false)
+
+  if (!authenticated) {
+    return <PasswordGate />
+  }
 
   if (!gameStarted || !sessionReady) {
     return <Onboarding onReady={() => setSessionReady(true)} />

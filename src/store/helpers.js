@@ -183,6 +183,7 @@ export const CASE_GENERATION_SCHEDULE = [
 ]
 
 export const defaultState = {
+  authenticated: typeof localStorage !== 'undefined' && localStorage.getItem('llw_auth') === 'true',
   player: { ...defaultPlayer },
   cases: [],
   pendingCases: [],

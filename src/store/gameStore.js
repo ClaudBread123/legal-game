@@ -510,6 +510,16 @@ Timely responses to opposing counsel and court notices are not optional. This ha
     persist({ ...state, ...updated })
   },
 
+  authenticate(password) {
+    const CORRECT_PASSWORD = 'llopizwizel2026'
+    if (password === CORRECT_PASSWORD) {
+      localStorage.setItem('llw_auth', 'true')
+      set({ authenticated: true })
+      return true
+    }
+    return false
+  },
+
   resetGame() {
     localStorage.removeItem(SAVE_KEY)
     set({ ...defaultState })
